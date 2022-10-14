@@ -6,7 +6,7 @@ data = os.read(disk_fd,512)
 tmp = os.fdopen(disk_fd,'rb')
 i = 1024
 #tmp.seek(i)
-tmp.seek(357951488)
+tmp.seek(0)
 
 def HexLittleEndianToDecimal(val:str)->int:
     if(len(val) == 1):
@@ -25,7 +25,7 @@ while True:
             first_offset_of_content = HexLittleEndianToDecimal(s[current+20:current+21])
             # start_of_content = first_offset_of_content
             if(HexLittleEndianToDecimal(s[current:current+1]) == 48):
-                filename = s[current+first_offset_of_content+66:current+first_offset_of_content+74]
+                filename = s[current+first_offset_of_content+66:current+first_offset_of_content+size_of_attribute_content+1]
                 print(filename.decode("latin-1"))
             current = current + size_of_attribute_content + first_offset_of_content
             if(size_of_attribute_content == 0):
@@ -33,7 +33,7 @@ while True:
         # first_attribute = int(s[28:29].hex(),base = 16)
         # print(first_attribute) 
         # print(count)
-    if(s == ""):
+    if(i>=2147483616):
         break
     i+=1024
     tmp.seek(i)
