@@ -57,7 +57,7 @@ a = pbstable.sectors_per_cluster*pbstable.mft_cluster_number*pbstable.bytes_per_
 i = a
 tmp.seek(i)
 skipped = 0
-files:list[File]
+files:list[File] = []
 count = 0
 while True:
     s = tmp.read(1024)#should read from pbp
@@ -71,8 +71,8 @@ while True:
             size_of_attribute_content = HexLittleEndianToUnsignedDecimal(s[current+16:current+19+1])
             first_offset_of_content = HexLittleEndianToUnsignedDecimal(s[current+20:current+21])
             header:AttributeHeader
-            a30:Attribute30
-            a90:Attribute90
+            a30:Attribute30 = None
+            a90:Attribute90 = None
             if(HexLittleEndianToUnsignedDecimal(s[current:current+1]) == 48):
                 if(s[current+first_offset_of_content+66:current+first_offset_of_content+size_of_attribute_content]
                 .decode("utf-16le").startswith("$")):
@@ -95,7 +95,6 @@ while True:
                     filename_length=filename_length, 
                     filename=filename.decode("utf-16le")
                     )
-                print(a30.filename)
                 # filename = s[current+first_offset_of_content+66:current+first_offset_of_content+size_of_attribute_content]
                 # print(filename.decode("utf-16le"))
             if(HexLittleEndianToUnsignedDecimal(s[current:current+1]) == 144):
@@ -111,7 +110,7 @@ while True:
                     offset_to_attribute=HexLittleEndianToUnsignedDecimal(s[current+20:current+22]),
                     indexed_flag=0)
                 
-                cur = current + 24
+                cur = current + 32
                 entries:list[IndexEntry]= []
                 index_root = IndexRoot(
                     attribute_type=s[cur:cur+4].hex(),
@@ -129,7 +128,7 @@ while True:
                 if(index_header.has_subnode_flag != 0):
                     break
                 cur+=16
-                while (s[cur + 8: cur + 12].hex()!=0xffffffff):
+                while (cur + 32 + 16 < current + header.length - 8):
                     index_entry = IndexEntry(
                         length_of_index_entry=HexLittleEndianToUnsignedDecimal(s[cur+8:cur+10]),
                         length_of_stream=HexLittleEndianToUnsignedDecimal(s[cur+10:cur+12]),
@@ -138,13 +137,15 @@ while True:
                         length_of_filename=s[cur+80],
                         filename=s[cur+82:cur+82+s[cur+80]*2].decode("utf-16le")
                     )
-                    print(index_entry.filename)
                     entries.append(index_entry)
-                    cur+=index_entry.length_of_filename
-                a90 = Attribute90(index_header=IndexHeader(),
-                    index_root=IndexRoot(),
+                    cur+=index_entry.length_of_index_entry
+                a90 = Attribute90(header=header,
+                    index_header=index_header,
+                    index_root=index_root,
                     index_entries=entries)
-                current = 1024 * cur/1024
+
+                files.append(File(a30,a90))
+                break
                 
             current = current + size_of_attribute
             if(size_of_attribute_content == 0):
@@ -157,3 +158,8 @@ while True:
         break
     i+=1024
     tmp.seek(i)
+
+f:File
+for f in files:
+    print(f.filename)
+    f.printTree()

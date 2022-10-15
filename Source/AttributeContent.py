@@ -48,3 +48,11 @@ class Attribute90:
 class File:
     filename:Attribute30 
     index_root:Attribute90
+
+    def __init__(self, filename, index_root) -> None:
+        self.filename = filename
+        self.index_root = index_root
+    def printTree(self):
+        if(self.index_root):
+            for i in self.index_root.index_entries:
+                print("-----", i.filename)
