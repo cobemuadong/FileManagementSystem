@@ -13,13 +13,15 @@ class Attribute30(Attribute):
 
 class IndexEntry:
     def __init__(self, length_of_index_entry, length_of_stream, index_flags, 
-    size_of_file, length_of_filename, filename) -> None:
+    size_of_file, length_of_filename, filename, file_ref, parent_ref ) -> None:
         self.length_of_index_entry = length_of_index_entry
         self.length_of_stream = length_of_stream
         self.index_flags = index_flags
         self.size_of_file = size_of_file
         self.length_of_filename = length_of_filename
         self.filename = filename
+        self.file_ref = file_ref
+        self.parent_ref = parent_ref
 
 class IndexRoot:
     def __init__(self, attribute_type, collation_rule, allocation_index_entry, 
@@ -38,10 +40,7 @@ class IndexHeader:
 
 
 class Attribute90(Attribute):
-    header:AttributeHeader
-    index_root:IndexRoot
-    index_entries:list[IndexEntry]
-    def __init__(self, header,index_root, index_header, index_entries) -> None:
+    def __init__(self, header,index_root: IndexRoot, index_header: IndexHeader, index_entries: list[IndexEntry]) -> None:
         super().__init__(header)
         self.index_entries = index_entries
         self.index_root = index_root

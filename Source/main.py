@@ -12,6 +12,20 @@ tmp.seek(0)
 
 # This function convert hex string in little endian into unsigned int
 
+def MREF(mft_reference):
+    """
+    Given a MREF/mft_reference, return the record number part.
+    """
+    mft_reference = struct.unpack_from("<Q", mft_reference)[0]
+    return mft_reference & 0xFFFFFFFFFFFF
+
+
+def MSEQNO(mft_reference):
+    """
+    Given a MREF/mft_reference, return the sequence number part.
+    """
+    mft_reference = struct.unpack_from("<Q", mft_reference)[0]
+    return (mft_reference >> 48) & 0xFFFF
 
 def HexLittleEndianToUnsignedDecimal(val: str) -> int:
     if(len(val) == 1):
@@ -92,6 +106,8 @@ def ReadAttribute90(string: bytes, current: int) -> Attribute90:
     cur += 16
     while (cur + 32 + 16 < current + header.length - 8):
         index_entry = IndexEntry(
+            file_ref=MREF(string[cur:cur+8]),
+            parent_ref=MREF(string[cur+16:cur+24]),
             length_of_index_entry=HexLittleEndianToUnsignedDecimal(
                 string[cur+8:cur+10]),
             length_of_stream=HexLittleEndianToUnsignedDecimal(
@@ -149,6 +165,14 @@ def Read() -> list[File]:
             current = first_attribute
             a30 = None
             a90 = None
+            id = HexLittleEndianToUnsignedDecimal(string[44:44+4])
+            file_id_array:list[int] = []
+            for f in files:
+                if(f.index):
+                    for e in f.index.index_entries:
+                        file_id_array.append(e.file_ref)
+            if(id in file_id_array):
+                continue
             while True:
                 if(string[current:current+4] == b'\xff\xff\xff\xff'):
                     break

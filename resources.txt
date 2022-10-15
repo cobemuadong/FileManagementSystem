@@ -2,3 +2,7 @@ https://www.youtube.com/watch?v=DOOba3e1hjo&ab_channel=%C4%90%E1%BB%8BnhNguy%E1%
 https://github.com/hungngocphat01/HCMUS-Windows-FAT-NTFS
 https://www.ntfs.com/ntfs-partition-boot-sector.htm
 https://people.cs.umass.edu/~liberato/courses/2018-spring-compsci365+590f/lecture-notes/14-more-on-ntfs/
+http://inform.pucp.edu.pe/~inf232/Ntfs/ntfs_doc_v0.5/concepts/index_record.html
+https://flatcap.github.io/linux-ntfs/ntfs/concepts/index_entry.html
+https://sabercomlogica.com/en/ntfs-resident-and-non-resident-named-attributes/
+http://ntfs.com/ntfs-files-types.htm
