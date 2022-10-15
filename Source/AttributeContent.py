@@ -1,9 +1,13 @@
 from AttributeHeader import *
 
 
-class Attribute30:
-    def __init__(self,header, filename_length, filename) -> None:
-        self.header:AttributeHeader = header
+class Attribute:
+    def __init__(self, header: AttributeHeader) -> None:
+        self.header = header
+
+class Attribute30(Attribute):
+    def __init__(self, header, filename_length, filename) -> None:
+        super().__init__(header)
         self.filename_length = filename_length
         self.filename = filename
 
@@ -33,26 +37,24 @@ class IndexHeader:
         self.has_subnode_flag = has_subnode_flag
 
 
-class Attribute90:
+class Attribute90(Attribute):
     header:AttributeHeader
     index_root:IndexRoot
-    index_header:IndexHeader
     index_entries:list[IndexEntry]
     def __init__(self, header,index_root, index_header, index_entries) -> None:
-        self.header = header
+        super().__init__(header)
         self.index_entries = index_entries
         self.index_root = index_root
         self.index_header = index_header
     
 
 class File:
-    filename:Attribute30 
-    index_root:Attribute90
 
-    def __init__(self, filename, index_root) -> None:
+    def __init__(self, filename: Attribute30, index: Attribute90) -> None:
         self.filename = filename
-        self.index_root = index_root
+        self.index = index
     def printTree(self):
-        if(self.index_root):
-            for i in self.index_root.index_entries:
+        print(self.filename.filename)
+        if(self.index):
+            for i in self.index.index_entries:
                 print("-----", i.filename)
