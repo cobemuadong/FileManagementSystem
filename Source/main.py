@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from PartitionBootSector import *
 import os
 import struct
 
 disk_fd = os.open(r'\\.\E:',os.O_RDONLY|os.O_BINARY)
-data = os.read(disk_fd,512)
+# data = os.read(disk_fd,512)
 tmp = os.fdopen(disk_fd,'rb')
 i = 1024
 #tmp.seek(i)
@@ -30,59 +30,28 @@ def HexLittleEndianToSignedDecimal(val:str)->int:
     if(len(val) == 8):
         return struct.unpack('<q', val)[0]
 
-@dataclass
-class BPBTable:
-    def __init__(self, bytes_per_sector, sectors_per_cluster,
-    sectors_per_track, numbers_of_heads, total_sectors, mft_cluster_number) -> None:
-        self.__bytes_per_sector = bytes_per_sector
-        self.__sectors_per_cluster = sectors_per_cluster
-        self.__sectors_per_track = sectors_per_track
-        self.__numbers_of_heads = numbers_of_heads
-        self.__total_sectors = total_sectors
-        self.__mft_cluster_number = mft_cluster_number
 
-    def get_bytes_per_sector(self):
-        return self.__bytes_per_sector
-
-    def get_sectors_per_cluster(self):
-        return self.__sectors_per_cluster
-
-    def get_sectors_per_track(self):
-        return self.__sectors_per_track
-    
-    def get_numbers_of_heads(self):
-        return self.__numbers_of_heads
-    
-    def get_total_sectors(self):
-        return self.__total_sectors
-
-    def get_mft_cluster_number(self):
-        return self.__mft_cluster_number
-
-    bytes_per_sector = property(get_bytes_per_sector)
-    sectors_per_cluster = property(get_sectors_per_cluster)
-    sectors_per_track = property(get_sectors_per_track)
-    numbers_of_heads = property(get_numbers_of_heads)
-    total_sectors = property(get_total_sectors)
-    mft_cluster_number = property(get_mft_cluster_number)
-
-print(data[11:13])
 count = 0
 s = tmp.read(1024)
-bpbtable = BPBTable(
-    HexLittleEndianToUnsignedDecimal(s[11:13]),
-    HexLittleEndianToUnsignedDecimal(s[13:14]),
-    HexLittleEndianToUnsignedDecimal(s[24:26]),
-    HexLittleEndianToUnsignedDecimal(s[26:28]),
-    HexLittleEndianToUnsignedDecimal(s[40:48]),
-    HexLittleEndianToUnsignedDecimal(s[48:48+8])
+pbstable = PartitionBootSector(
+    bytes_per_sector = HexLittleEndianToUnsignedDecimal(s[11:11+2]),
+    sectors_per_cluster = HexLittleEndianToUnsignedDecimal(s[13:13+1]),
+    reserved_sectors = HexLittleEndianToUnsignedDecimal(s[14:14+2]),
+    media_descriptor = s[21:21+1].hex(),
+    sectors_per_track = HexLittleEndianToUnsignedDecimal(s[24:24+2]),
+    numbers_of_heads = HexLittleEndianToUnsignedDecimal(s[26:26+2]),
+    hidden_sectors = HexLittleEndianToUnsignedDecimal(s[28:28+4]),
+    total_sectors = HexLittleEndianToUnsignedDecimal(s[40:40+8]),
+    mft_cluster_number = HexLittleEndianToUnsignedDecimal(s[48:48+8]), 
+    mftmirr_cluster_number = HexLittleEndianToUnsignedDecimal(s[56:56+8]),
+    bytes_per_file_record_segment = 2**abs(HexLittleEndianToSignedDecimal(s[64:64+1])),
+    cluster_per_index = HexLittleEndianToUnsignedDecimal(s[68:68+4]),
+    volume_serial_number = s[72:72+8].hex()
 )
-print(bpbtable.total_sectors)
-print(bpbtable.mft_cluster_number)
-print(bpbtable.bytes_per_sector)
-a = bpbtable.sectors_per_cluster*bpbtable.mft_cluster_number*bpbtable.bytes_per_sector + 1024*26
-print(a)
-print(s[64:68])
+
+pbstable.printVolumeInformation()
+
+a = pbstable.sectors_per_cluster*pbstable.mft_cluster_number*pbstable.bytes_per_sector + 1024*26
 i = a
 tmp.seek(i)
 skipped = 0
@@ -95,19 +64,15 @@ while True:
             size_of_attribute = HexLittleEndianToUnsignedDecimal(s[current+4:current+7+1])
             size_of_attribute_content = HexLittleEndianToUnsignedDecimal(s[current+16:current+19+1])
             first_offset_of_content = HexLittleEndianToUnsignedDecimal(s[current+20:current+21])
-            # start_of_content = first_offset_of_content
             if(HexLittleEndianToUnsignedDecimal(s[current:current+1]) == 48):
-                filename = s[current+first_offset_of_content+66:current+first_offset_of_content+size_of_attribute_content+1]
-                print(filename.decode("latin-1"))
+                filename = s[current+first_offset_of_content+66:current+first_offset_of_content+size_of_attribute_content]
+                print(filename.decode("utf-16le"))
             current = current + size_of_attribute
             if(size_of_attribute_content == 0):
                 break
-        # first_attribute = int(s[28:29].hex(),base = 16)
-        # print(first_attribute)
-        # print(count)
     else:
         skipped+=1
-    if(i>=bpbtable.total_sectors*bpbtable.bytes_per_sector*0.5):
+    if(i>=pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
         break
     if(skipped >= 100):
         break
