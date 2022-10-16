@@ -20,6 +20,13 @@ def MREF(mft_reference):
     mft_reference = struct.unpack_from("<Q", mft_reference)[0]
     return mft_reference & 0xFFFFFFFFFFFF
 
+def ParseRunData(string):
+    size_byte = int(string.hex()[0])
+    cluster_count_byte = int(string.hex()[1])
+    print(string.hex())
+    first_cluster = HexLittleEndianToUnsignedDecimal(string[1+cluster_count_byte:size_byte+cluster_count_byte+1])
+    return (size_byte,cluster_count_byte,first_cluster)
+
 
 def MSEQNO(mft_reference):
     """
@@ -53,17 +60,20 @@ def HexLittleEndianToSignedDecimal(val: str) -> int:
         return struct.unpack('<q', val)[0]
 
 
-def ReadAttributeHeader(string: bytes, current: int) -> AttributeHeader:
+def ReadAttributeHeader(string: bytes, current: int):
     if(string[current+8] > 0):
         return NonResidentAttributeHeader(
         type=string[current:current+4].hex(),
         length=HexLittleEndianToUnsignedDecimal(string[current+4:current+8]),
         resistent_flag=string[current+8],
         name_length=string[current+9],
-        name_offset=string[current+10:current+12],
-        flags=string[current+12:current+14],
-        attribute_id=string[current+14:current+15],
-        runlist = string[current+72:current+80])
+        name_offset=HexLittleEndianToUnsignedDecimal(string[current+10:current+12]),
+        flags=HexLittleEndianToUnsignedDecimal(string[current+12:current+14]),
+        attribute_id=HexLittleEndianToUnsignedDecimal(string[current+14:current+16]),
+        run_offset=HexLittleEndianToUnsignedDecimal(string[current+32:current+34]),
+        runlist = string[current+72:current+80],
+        real_size=HexLittleEndianToUnsignedDecimal(string[current+48:current+48+8]),
+        allocated_size=HexLittleEndianToUnsignedDecimal(string[current+40:current+40+8]))
     else:
         return ResidentAttributeHeader(
         type=string[current:current+4].hex(),
@@ -162,6 +172,24 @@ def readPBSTable(string) -> PartitionBootSector:
         cluster_per_index=HexLittleEndianToUnsignedDecimal(string[68:68+4]),
         volume_serial_number=string[72:72+8].hex())
 
+def ReadFileText(string, current, i):
+    header = ReadAttributeHeader(string,current)
+    if(header.resistent_flag == 0):
+        if(header.length_of_attribute % 2 != 0):
+            header.length_of_attribute+=1
+        return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("ascii")
+    else:
+        offset = string[current+header.run_offset: current+header.run_offset+8]
+        first_cluster = ParseRunData(offset)[2]
+        tmp.seek(first_cluster*8*512)
+        if(header.real_size%2!=0):
+            header.real_size+=1
+        temp = tmp.read(1024*header.allocated_size)
+        tmp.seek(i)
+        #print(temp[0:header.real_size])
+        print(first_cluster)
+        return temp[0:header.real_size].decode("ascii")
+
 def ReadNode() -> list[Node]:
     lists:list[Node] = []
     tmp.seek(0)
@@ -253,6 +281,11 @@ def Read() -> list[File]:
                     if(a90 == None):
                         break
                     current += a90.header.length
+                elif(attribute_type == 128):
+                    if(a30.filename[-3:] == "txt"):
+                        print(a30.filename)
+                        print(ReadFileText(string, current,i))
+                    current += ReadAttributeHeader(string, current).length    
                 else:
                     current += ReadAttributeHeader(string, current).length
             if(a30 != None or a90 != None):
@@ -261,13 +294,13 @@ def Read() -> list[File]:
             break
     return files
 
-lists = ReadNode()
-for i in lists:
-    if(i.parent_id == None):
-        print(i.this_id)
-# files = Read()
-# for f in files:
-#     f.printTree()
+# lists = ReadNode()
+# for i in lists:
+#     if(i.parent_id == None):
+#         print(i.this_id)
+files = Read()
+for f in files:
+    f.printTree()
 
 
 # count = 0

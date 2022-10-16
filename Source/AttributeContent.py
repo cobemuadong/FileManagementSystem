@@ -19,7 +19,7 @@ class Attribute:
 class ResidentAttributeHeader(AttributeHeader):
     def __init__(self, type, length, resistent_flag, name_length, 
     name_offset, flags, attribute_id, length_of_attribute, offset_to_attribute, 
-    indexed_flag, ) -> None:
+    indexed_flag ) -> None:
         super().__init__(type, length, resistent_flag, name_length, name_offset, 
         flags, attribute_id)
         self.length_of_attribute = length_of_attribute
@@ -29,10 +29,14 @@ class ResidentAttributeHeader(AttributeHeader):
 
 class NonResidentAttributeHeader(AttributeHeader):
     def __init__(self, type, length, resistent_flag, name_length, 
-    name_offset, flags, attribute_id, runlist) -> None:
+    name_offset, flags, attribute_id, runlist, run_offset, real_size,
+    allocated_size) -> None:
         super().__init__(type, length, resistent_flag, name_length, name_offset, 
         flags, attribute_id)
+        self.run_offset = run_offset
         self.runlist = runlist
+        self.real_size = real_size
+        self.allocated_size = allocated_size
         
         
 class Attribute():
@@ -79,6 +83,11 @@ class Attribute90(Attribute):
         self.index_entries = index_entries
         self.index_root = index_root
         self.index_header = index_header
+
+class Attribute80(Attribute):
+    def __init__(self, header) -> None:
+        super().__init__(header)
+
 
 class File:
     def __init__(self, filename: Attribute30, index: Attribute90) -> None:
