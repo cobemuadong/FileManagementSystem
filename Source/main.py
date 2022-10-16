@@ -12,6 +12,7 @@ tmp.seek(0)
 
 # This function convert hex string in little endian into unsigned int
 
+
 def MREF(mft_reference):
     """
     Given a MREF/mft_reference, return the record number part.
@@ -26,6 +27,7 @@ def MSEQNO(mft_reference):
     """
     mft_reference = struct.unpack_from("<Q", mft_reference)[0]
     return (mft_reference >> 48) & 0xFFFF
+
 
 def HexLittleEndianToUnsignedDecimal(val: str) -> int:
     if(len(val) == 1):
@@ -50,8 +52,20 @@ def HexLittleEndianToSignedDecimal(val: str) -> int:
     if(len(val) == 8):
         return struct.unpack('<q', val)[0]
 
-def ReadAttributeHeader(string: bytes, current: int)->AttributeHeader:
-    header = AttributeHeader(
+
+def ReadAttributeHeader(string: bytes, current: int) -> AttributeHeader:
+    if(string[current+8] > 0):
+        return NonResidentAttributeHeader(
+        type=string[current:current+4].hex(),
+        length=HexLittleEndianToUnsignedDecimal(string[current+4:current+8]),
+        resistent_flag=string[current+8],
+        name_length=string[current+9],
+        name_offset=string[current+10:current+12],
+        flags=string[current+12:current+14],
+        attribute_id=string[current+14:current+15],
+        runlist = string[current+72:current+80])
+    else:
+        return ResidentAttributeHeader(
         type=string[current:current+4].hex(),
         length=HexLittleEndianToUnsignedDecimal(string[current+4:current+8]),
         resistent_flag=string[current+8],
@@ -64,10 +78,10 @@ def ReadAttributeHeader(string: bytes, current: int)->AttributeHeader:
         offset_to_attribute=HexLittleEndianToUnsignedDecimal(
             string[current+20:current+22]),
         indexed_flag=0)
-    return header
+
 
 def ReadAttribute30(string: bytes, current: int) -> Attribute30:
-    header = ReadAttributeHeader(string,current)
+    header = ReadAttributeHeader(string, current)
     filename_length = string[current+header.offset_to_attribute+64]
     filename = string[current+header.offset_to_attribute+66:current +
                       header.offset_to_attribute+header.length_of_attribute]
@@ -80,6 +94,21 @@ def ReadAttribute30(string: bytes, current: int) -> Attribute30:
     )
     return a30
 
+def ReadIndexEntry(string, cur) -> IndexEntry:
+    return IndexEntry(
+        file_ref=MREF(string[cur:cur+8]),
+        parent_ref=MREF(string[cur+16:cur+24]),
+        length_of_index_entry=HexLittleEndianToUnsignedDecimal(
+            string[cur+8:cur+10]),
+        length_of_stream=HexLittleEndianToUnsignedDecimal(
+            string[cur+10:cur+12]),
+        index_flags=HexLittleEndianToUnsignedDecimal(
+            string[cur+12:cur+14]),
+        size_of_file=HexLittleEndianToUnsignedDecimal(
+            string[cur+64:cur+72]),
+        length_of_filename=string[cur+80],
+        filename=string[cur+82:cur+82+string[cur+80]*2].decode("utf-16le")
+    )
 
 def ReadAttribute90(string: bytes, current: int) -> Attribute90:
     header = ReadAttributeHeader(string, current)
@@ -105,20 +134,7 @@ def ReadAttribute90(string: bytes, current: int) -> Attribute90:
         return None
     cur += 16
     while (cur + 32 + 16 < current + header.length - 8):
-        index_entry = IndexEntry(
-            file_ref=MREF(string[cur:cur+8]),
-            parent_ref=MREF(string[cur+16:cur+24]),
-            length_of_index_entry=HexLittleEndianToUnsignedDecimal(
-                string[cur+8:cur+10]),
-            length_of_stream=HexLittleEndianToUnsignedDecimal(
-                string[cur+10:cur+12]),
-            index_flags=HexLittleEndianToUnsignedDecimal(
-                string[cur+12:cur+14]),
-            size_of_file=HexLittleEndianToUnsignedDecimal(
-                string[cur+64:cur+72]),
-            length_of_filename=string[cur+80],
-            filename=string[cur+82:cur+82+string[cur+80]*2].decode("utf-16le")
-        )
+        index_entry = ReadIndexEntry(string,cur)
         entries.append(index_entry)
         cur += index_entry.length_of_index_entry
     a90 = Attribute90(header=header,
@@ -139,34 +155,82 @@ def readPBSTable(string) -> PartitionBootSector:
         hidden_sectors=HexLittleEndianToUnsignedDecimal(string[28:28+4]),
         total_sectors=HexLittleEndianToUnsignedDecimal(string[40:40+8]),
         mft_cluster_number=HexLittleEndianToUnsignedDecimal(string[48:48+8]),
-        mftmirr_cluster_number=HexLittleEndianToUnsignedDecimal(string[56:56+8]),
+        mftmirr_cluster_number=HexLittleEndianToUnsignedDecimal(
+            string[56:56+8]),
         bytes_per_file_record_segment=2**abs(
             HexLittleEndianToSignedDecimal(string[64:64+1])),
         cluster_per_index=HexLittleEndianToUnsignedDecimal(string[68:68+4]),
         volume_serial_number=string[72:72+8].hex())
+
+def ReadNode() -> list[Node]:
+    lists:list[Node] = []
+    tmp.seek(0)
+    string = tmp.read(1024)
+    pbstable = readPBSTable(string)
+    i = pbstable.sectors_per_cluster*pbstable.mft_cluster_number * \
+        pbstable.bytes_per_sector + pbstable.bytes_per_file_record_segment*26
+    skipped = 0
+    while True:
+        if(skipped >= 100):
+            break
+        tmp.seek(i)
+        i += 1024
+        string = tmp.read(1024)
+        string = tmp.read(pbstable.bytes_per_file_record_segment)
+        if(string[0:4] == b'FILE'):
+            first_attribute = HexLittleEndianToUnsignedDecimal(string[20:21])
+            attribute_type = HexLittleEndianToSignedDecimal(
+                string[first_attribute:first_attribute+4])
+            current = first_attribute
+            id = HexLittleEndianToUnsignedDecimal(string[44:44+4])
+            children_id:list[int] = []
+            while True:
+                if(string[current:current+4] == b'\xff\xff\xff\xff'):
+                    break
+                attribute_type = HexLittleEndianToSignedDecimal(
+                    string[current:current+4])
+                if(attribute_type == 144):
+                    a90 = ReadAttribute90(string, current)
+                    if(a90 == None):
+                        break
+                    if(string[current+12] != 0):
+                        break
+                    if(a90.index_entries != None):
+                        for e in a90.index_entries:
+                            children_id.append(e.file_ref)            
+                    current += a90.header.length
+                else:
+                    current += ReadAttributeHeader(string, current).length
+            
+            lists.append(Node(id,children_id,i))
+        if(i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
+            break
+    return lists
 
 def Read() -> list[File]:
     files: list[File] = []
     tmp.seek(0)
     string = tmp.read(1024)
     pbstable = readPBSTable(string)
-    i = pbstable.sectors_per_cluster*pbstable.mft_cluster_number * pbstable.bytes_per_sector + pbstable.bytes_per_file_record_segment*26
+    i = pbstable.sectors_per_cluster*pbstable.mft_cluster_number * \
+        pbstable.bytes_per_sector + pbstable.bytes_per_file_record_segment*26
     skipped = 0
     while True:
-        if(skipped>=100):
+        if(skipped >= 100):
             break
         tmp.seek(i)
-        i+=1024
+        i += 1024
         string = tmp.read(1024)
         string = tmp.read(pbstable.bytes_per_file_record_segment)
         if(string[0:4] == b'FILE'):
             first_attribute = HexLittleEndianToUnsignedDecimal(string[20:21])
-            attribute_type = HexLittleEndianToSignedDecimal(string[first_attribute:first_attribute+4])
+            attribute_type = HexLittleEndianToSignedDecimal(
+                string[first_attribute:first_attribute+4])
             current = first_attribute
             a30 = None
             a90 = None
             id = HexLittleEndianToUnsignedDecimal(string[44:44+4])
-            file_id_array:list[int] = []
+            file_id_array: list[int] = []
             for f in files:
                 if(f.index):
                     for e in f.index.index_entries:
@@ -176,28 +240,34 @@ def Read() -> list[File]:
             while True:
                 if(string[current:current+4] == b'\xff\xff\xff\xff'):
                     break
-                attribute_type = HexLittleEndianToSignedDecimal(string[current:current+4])
+                attribute_type = HexLittleEndianToSignedDecimal(
+                    string[current:current+4])
                 if(attribute_type == 48):
-                    a30 = ReadAttribute30(string,current)
-                    if(a30==None):
-                        skipped+=1
+                    a30 = ReadAttribute30(string, current)
+                    if(a30 == None):
+                        skipped += 1
                         break
-                    current+=a30.header.length
+                    current += a30.header.length
                 elif(attribute_type == 144):
                     a90 = ReadAttribute90(string, current)
-                    if(a90==None):
+                    if(a90 == None):
                         break
-                    current+=a90.header.length
+                    current += a90.header.length
                 else:
-                    current+=ReadAttributeHeader(string, current).length
+                    current += ReadAttributeHeader(string, current).length
             if(a30 != None or a90 != None):
-                files.append(File(a30,a90))
-        if(i>=pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
+                files.append(File(a30, a90))
+        if(i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
             break
     return files
-files = Read()
-for f in files:
-    f.printTree()
+
+lists = ReadNode()
+for i in lists:
+    if(i.parent_id == None):
+        print(i.this_id)
+# files = Read()
+# for f in files:
+#     f.printTree()
 
 
 # count = 0
