@@ -28,14 +28,6 @@ def ParseRunData(string):
     return (size_byte,cluster_count_byte,first_cluster)
 
 
-def MSEQNO(mft_reference):
-    """
-    Given a MREF/mft_reference, return the sequence number part.
-    """
-    mft_reference = struct.unpack_from("<Q", mft_reference)[0]
-    return (mft_reference >> 48) & 0xFFFF
-
-
 def HexLittleEndianToUnsignedDecimal(val: str) -> int:
     if(len(val) == 1):
         return int(val.hex(), 16)
@@ -47,7 +39,6 @@ def HexLittleEndianToUnsignedDecimal(val: str) -> int:
         return struct.unpack('<Q', val)[0]
 
 # This function convert hex string in little endian into signed int
-
 
 def HexLittleEndianToSignedDecimal(val: str) -> int:
     if(len(val) == 1):
@@ -186,9 +177,18 @@ def ReadFileText(string, current, i):
             header.real_size+=1
         temp = tmp.read(1024*header.allocated_size)
         tmp.seek(i)
-        #print(temp[0:header.real_size])
         print(first_cluster)
-        return temp[0:header.real_size].decode("ascii")
+        return temp[0:header.real_size].decode("utf-8")
+
+def isDirectory(string, current):
+    if(string[current+8] > 0):
+        return False
+    if(string[current+24:current+24+8].decode("utf-16le") == "$I30"):
+        return True
+
+def hasIndexEntry(string, current):
+    if(string[current]):
+        pass
 
 def ReadNode() -> list[Node]:
     lists:list[Node] = []
