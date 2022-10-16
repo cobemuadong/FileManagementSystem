@@ -1,9 +1,43 @@
-from AttributeHeader import *
+from cProfile import run
 
+class AttributeHeader:
+    def __init__(self, type, length, resistent_flag, name_length, name_offset, flags, 
+    attribute_id) -> None:
+        self.type = type
+        self.length = length
+        self.resistent_flag = resistent_flag
+        self.name_length = name_length
+        self.name_offset = name_offset
+        self.flags = flags
+        self.attribute_id = attribute_id
+    
 
 class Attribute:
     def __init__(self, header: AttributeHeader) -> None:
         self.header = header
+
+class ResidentAttributeHeader(AttributeHeader):
+    def __init__(self, type, length, resistent_flag, name_length, 
+    name_offset, flags, attribute_id, length_of_attribute, offset_to_attribute, 
+    indexed_flag, ) -> None:
+        super().__init__(type, length, resistent_flag, name_length, name_offset, 
+        flags, attribute_id)
+        self.length_of_attribute = length_of_attribute
+        self.offset_to_attribute = offset_to_attribute
+        self.indexed_flag = indexed_flag
+
+
+class NonResidentAttributeHeader(AttributeHeader):
+    def __init__(self, type, length, resistent_flag, name_length, 
+    name_offset, flags, attribute_id, runlist) -> None:
+        super().__init__(type, length, resistent_flag, name_length, name_offset, 
+        flags, attribute_id)
+        self.runlist = runlist
+        
+        
+class Attribute():
+    def __init__(self, header) -> None:
+        self.header = header        
 
 class Attribute30(Attribute):
     def __init__(self, header, filename_length, filename) -> None:
@@ -45,10 +79,8 @@ class Attribute90(Attribute):
         self.index_entries = index_entries
         self.index_root = index_root
         self.index_header = index_header
-    
 
 class File:
-
     def __init__(self, filename: Attribute30, index: Attribute90) -> None:
         self.filename = filename
         self.index = index
@@ -57,3 +89,10 @@ class File:
         if(self.index):
             for i in self.index.index_entries:
                 print("-----", i.filename)
+
+class Node:
+    def __init__(self,parent_id, this_id:int, children: list[int], sector:int):
+        self.parent_id = parent_id
+        self.this_id = this_id
+        self.children = children
+        self.sector = sector
