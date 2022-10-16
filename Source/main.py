@@ -178,7 +178,7 @@ def ReadFileText(string, current, i):
         temp = tmp.read(1024*header.allocated_size)
         tmp.seek(i)
         print(first_cluster)
-        return temp[0:header.real_size].decode("utf-8")
+        return temp[0:header.real_size].decode("utf-8", errors='replace')
 
 def isDirectory(string, current):
     if(string[current+8] > 0):
@@ -283,7 +283,6 @@ def Read() -> list[File]:
                     current += a90.header.length
                 elif(attribute_type == 128):
                     if(a30.filename[-3:] == "txt"):
-                        print(a30.filename)
                         print(ReadFileText(string, current,i))
                     current += ReadAttributeHeader(string, current).length    
                 else:
