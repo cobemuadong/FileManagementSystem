@@ -3,7 +3,7 @@ class AttributeHeader:
     attribute_id, length_of_attribute, offset_to_attribute, indexed_flag) -> None:
         self.type = type
         self.length = length
-        self.resistent_flag = resident_flag
+        self.resident_flag = resident_flag
         self.name_length = name_length
         self.name_offset = name_offset
         self.flags = flags
