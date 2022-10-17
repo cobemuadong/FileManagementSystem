@@ -299,9 +299,9 @@ def Read() -> list[File]:
 # for i in lists:
 #     if(i.parent_id == None):
 #         print(i.this_id)
-files = Read()
-for f in files:
-    f.printTree()
+# files = Read()
+# for f in files:
+#     f.printTree()
 
 
 # count = 0

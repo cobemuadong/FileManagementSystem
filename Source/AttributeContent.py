@@ -100,7 +100,7 @@ class File:
                 print("-----", i.filename)
 
 class Node:
-    def __init__(self,parent_id, this_id:int, children: list[int], sector:int):
+    def __init__(self,parent_id:int, this_id:int, children: list[int], sector:int):
         self.parent_id = parent_id
         self.this_id = this_id
         self.children = children
