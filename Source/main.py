@@ -3,7 +3,7 @@ from AttributeContent import *
 import os
 import struct
 
-disk_fd = os.open(r'\\.\E:', os.O_RDONLY | os.O_BINARY)
+disk_fd = os.open(r'\\.\D:', os.O_RDONLY | os.O_BINARY)
 # data = os.read(disk_fd,512)
 tmp = os.fdopen(disk_fd, 'rb')
 i = 1024
@@ -24,6 +24,8 @@ def ParseRunData(string):
     size_byte = int(string.hex()[0])
     cluster_count_byte = int(string.hex()[1])
     print(string.hex())
+    if(size_byte % 2 != 0):
+        size_byte +=1
     first_cluster = HexLittleEndianToUnsignedDecimal(string[1+cluster_count_byte:size_byte+cluster_count_byte+1])
     return (size_byte,cluster_count_byte,first_cluster)
 
@@ -168,16 +170,16 @@ def ReadFileText(string, current, i):
     if(header.resistent_flag == 0):
         if(header.length_of_attribute % 2 != 0):
             header.length_of_attribute+=1
-        return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("ascii")
+        return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8",errors='replace')
     else:
         offset = string[current+header.run_offset: current+header.run_offset+8]
         first_cluster = ParseRunData(offset)[2]
+        print(i)
         tmp.seek(first_cluster*8*512)
         if(header.real_size%2!=0):
             header.real_size+=1
         temp = tmp.read(1024*header.allocated_size)
         tmp.seek(i)
-        print(first_cluster)
         return temp[0:header.real_size].decode("utf-8", errors='replace')
 
 def isDirectory(string, current):
@@ -266,7 +268,7 @@ def Read() -> list[File]:
             if(id in file_id_array):
                 continue
             while True:
-                if(string[current:current+4] == b'\xff\xff\xff\xff'):
+                if(string[current:current+4] == b'\xff\xff\xff\xff' or current > 1024 - first_attribute):
                     break
                 attribute_type = HexLittleEndianToSignedDecimal(
                     string[current:current+4])
@@ -276,14 +278,14 @@ def Read() -> list[File]:
                         skipped += 1
                         break
                     current += a30.header.length
+                    if(a30.filename[-3:] == "txt"):
+                        print(ReadFileText(string, current,i))
                 elif(attribute_type == 144):
                     a90 = ReadAttribute90(string, current)
                     if(a90 == None):
                         break
                     current += a90.header.length
                 elif(attribute_type == 128):
-                    if(a30.filename[-3:] == "txt"):
-                        print(ReadFileText(string, current,i))
                     current += ReadAttributeHeader(string, current).length    
                 else:
                     current += ReadAttributeHeader(string, current).length
