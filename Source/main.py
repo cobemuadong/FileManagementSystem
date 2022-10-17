@@ -354,7 +354,8 @@ def gather_mft_id():
         #if index entry is in this mft or outside
         flag_offset = curr_offset + HexLittleEndianToUnsignedDecimal(buffer[curr_offset+20:curr_offset+22]) + 28
         flag = HexLittleEndianToUnsignedDecimal(buffer[flag_offset:flag_offset+1])
-        
+        curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+20:curr_offset+22])
+
         if flag == 0: #mft entry inside this mft record
             attr_size = HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
             max_offset = curr_offset + attr_size
