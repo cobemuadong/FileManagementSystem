@@ -380,6 +380,7 @@ def gather_mft_id():
                 node = Node(this_id)
                 node.children_id = children
                 node.sector = sector_no
+                mft_id_list.append(node)
         
         #mft entry outside this mft record
         else: 
@@ -427,6 +428,7 @@ def gather_mft_id():
                 node = Node(this_id)
                 node.children_id = children
                 node.sector = sector_no
+                mft_id_list.append(node)
              
 
 
