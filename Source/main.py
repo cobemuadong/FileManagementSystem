@@ -3,7 +3,7 @@ from AttributeContent import *
 import os
 import struct
 
-disk_fd = os.open(r'\\.\D:', os.O_RDONLY | os.O_BINARY)
+disk_fd = os.open(r'\\.\F:', os.O_RDONLY | os.O_BINARY)
 # data = os.read(disk_fd,512)
 tmp = os.fdopen(disk_fd, 'rb')
 i = 1024
@@ -294,6 +294,153 @@ def Read() -> list[File]:
         if(i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
             break
     return files
+
+def gather_mft_id():
+    '''
+    this function gather all the mft id and its children's id
+    '''
+    tmp_fd = os.open(r'\\.\F:', os.O_RDONLY | os.O_BINARY)
+    ptr = os.fdopen(tmp_fd,'rb')
+    
+    mft_id_list:list[Node] = []
+    sector_no = 0
+   
+    while sector_no < 2097152:
+        ptr.seek(sector_no * 512)
+        buffer = ptr.read(512)
+        if buffer[0:4] != b'FILE': #this sector is not an mft file
+            sector_no += 1
+            continue
+
+        # this sector is an mft file
+        buffer = ptr.read(1024)
+        this_id = HexLittleEndianToUnsignedDecimal(buffer[44:48])
+        children: list[int] = []
+
+        #determine if this_id has already existed in mtf_id_list or not
+        isExist = False
+        for i in mft_id_list:
+            if i.this_id == this_id:
+                isExist = True
+                break
+        
+        #if this mft is not for a folder, move on
+        flag = HexLittleEndianToUnsignedDecimal(buffer[22:24])
+        if 0 <= flag and flag <= 3: #true if not a folder
+            if isExist == True:
+                for i in mft_id_list:
+                    if i.this_id == this_id:
+                        i.sector = sector_no
+                        i.children = children
+                        break
+            else:
+                node = Node(this_id)
+                node.sector = sector_no
+                node.children = children
+                mft_id_list.append(node)
+            sector_no += 2
+            continue
+
+        #so this mft is for a folder
+        #go to attribute90
+        curr_offset = HexLittleEndianToUnsignedDecimal(buffer[20:22])
+        while True:
+            attr_signature = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
+            if attr_signature == 90:
+                break
+
+            curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
+
+        #if index entry is in this mft or outside
+        flag_offset = curr_offset + HexLittleEndianToUnsignedDecimal(buffer[curr_offset+20:curr_offset+22]) + 28
+        flag = HexLittleEndianToUnsignedDecimal(buffer[flag_offset:flag_offset+1])
+        
+        if flag == 0: #mft entry inside this mft record
+            attr_size = HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
+            max_offset = curr_offset + attr_size
+            curr_offset += 32
+
+            while curr_offset + 16 < max_offset:
+                child_id = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
+                check_this_id = HexLittleEndianToUnsignedDecimal(buffer[curr_offset+16:curr_offset+20])
+                if check_this_id != this_id:
+                    break
+                children.append(child_id)
+                curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+8:curr_offset+10])
+
+            #write info to mtf_id_list
+            if isExist == True:
+                for i in mft_id_list:
+                    if i.this_id == this_id:
+                        i.children_id = children
+                        i.sector = sector_no
+                        break
+            else:
+                node = Node(this_id)
+                node.children_id = children
+                node.sector = sector_no
+        
+        #mft entry outside this mft record
+        else: 
+            #find AttributeA0 and get datarun data
+            while True:
+                attr_signature = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
+                if attr_signature == 90:
+                    break
+
+                curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
+
+            datarun_offset = curr_offset + HexLittleEndianToUnsignedDecimal(buffer[curr_offset+ 32:curr_offset+34])
+            datarun = ParseRunData(buffer[datarun_offset:datarun_offset+8])
+
+            #datarun data
+            cluster_max = datarun[1]
+            cluster_start = datarun[2]
+
+            #gether ID at INDX sector
+            cluster_count = 0
+
+            while cluster_count < cluster_max: #each cluster loop
+                ptr.seek((cluster_start+cluster_count)*8*512)
+                temp_buffer = ptr.read(512*8)
+
+                temp_offset = 64
+                while temp_offset < 512*8: #each index entry loop
+                    child = HexLittleEndianToUnsignedDecimal(temp_buffer[temp_offset:temp_offset+4])
+                    check_this_id = HexLittleEndianToUnsignedDecimal(temp_buffer[temp_offset+16:temp_offset+20])
+                    if check_this_id != this_id:
+                        break
+                    children.append(child)
+                    temp_offset += HexLittleEndianToUnsignedDecimal(temp_buffer[temp_offset+8:temp_offset+10])
+            
+                cluster_count += 1
+
+            #write info to mtf_id_list
+            if isExist == True:
+                for i in mft_id_list:
+                    if i.this_id == this_id:
+                        i.children_id = children
+                        i.sector = sector_no
+                        break
+            else:
+                node = Node(this_id)
+                node.children_id = children
+                node.sector = sector_no
+             
+
+
+        sector_no += 2
+
+    return mft_id_list
+
+def printtest(tmp:list[Node]):
+    for i in tmp:
+        print("ID: ", i.id, " parent ID: ", i.parent_id)
+        print("Children: ", i.children)
+
+test = gather_mft_id()
+printtest(test)
+
 
 # lists = ReadNode()
 # for i in lists:

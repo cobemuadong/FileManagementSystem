@@ -101,8 +101,8 @@ class File:
 
 class Node:
     parent_id:int
+    children_id:list[int]
+    sector:int
 
-    def __init__(self, this_id:int, children: list[int], sector:int):
+    def __init__(self, this_id:int):
         self.this_id = this_id
-        self.children = children
-        self.sector = sector
