@@ -326,7 +326,7 @@ def gather_mft_id():
         
         #if this mft is not for a folder, move on
         flag = HexLittleEndianToUnsignedDecimal(buffer[22:24])
-        if 0 <= flag and flag <= 3: #true if not a folder
+        if 0 <= flag and flag <= 2: #true if not a folder
             if isExist == True:
                 for i in mft_id_list:
                     if i.this_id == this_id:
