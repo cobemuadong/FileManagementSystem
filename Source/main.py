@@ -346,7 +346,7 @@ def gather_mft_id():
         curr_offset = HexLittleEndianToUnsignedDecimal(buffer[20:22])
         while True:
             attr_signature = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
-            if attr_signature == 90:
+            if attr_signature == 144:
                 break
 
             curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
@@ -385,7 +385,7 @@ def gather_mft_id():
             #find AttributeA0 and get datarun data
             while True:
                 attr_signature = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
-                if attr_signature == 90:
+                if attr_signature == 160:
                     break
 
                 curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
