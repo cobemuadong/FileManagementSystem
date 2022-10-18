@@ -100,9 +100,9 @@ class File:
                 print("-----", i.filename)
 
 class Node:
-    parent_id:int
-    children_id:list[int]
-    sector:int
+    parent_id:int = -1
+    children_id:list[int] = []
+    sector:int = -1
 
     def __init__(self, this_id:int):
         self.this_id = this_id

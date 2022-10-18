@@ -20,67 +20,85 @@ def MREF(mft_reference):
     mft_reference = struct.unpack_from("<Q", mft_reference)[0]
     return mft_reference & 0xFFFFFFFFFFFF
 
+
 def ParseRunData(string):
     size_byte = int(string.hex()[0])
-    cluster_count_byte = int(string.hex()[1])
-    print(string.hex())
-    if(size_byte % 2 != 0):
-        size_byte +=1
-    first_cluster = HexLittleEndianToUnsignedDecimal(string[1+cluster_count_byte:size_byte+cluster_count_byte+1])
-    return (size_byte,cluster_count_byte,first_cluster)
+
+    digit_1 = int(string.hex()[0])
+    digit_2 = int(string.hex()[1])
+
+    cluster_count_byte = to_dec(string[1:1+digit_2])
+    first_cluster = to_dec(string[1+digit_2:1+digit_2+digit_1])
+
+    return (size_byte, cluster_count_byte, first_cluster)
+
+
+def to_dec(val: bytes):
+    result = 0
+    for i in reversed(val):
+        result = result * 16 * 16 + i
+    return result
 
 
 def HexLittleEndianToUnsignedDecimal(val: str) -> int:
-    if(len(val) == 1):
+    if (len(val) == 1):
         return int(val.hex(), 16)
-    if(len(val) == 2):
+    if (len(val) == 2):
         return struct.unpack('<H', val)[0]
-    if(len(val) == 4):
+    if (len(val) == 4):
         return struct.unpack('<L', val)[0]
-    if(len(val) == 8):
+    if (len(val) == 8):
         return struct.unpack('<Q', val)[0]
 
 # This function convert hex string in little endian into signed int
 
+
 def HexLittleEndianToSignedDecimal(val: str) -> int:
-    if(len(val) == 1):
+    if (len(val) == 1):
         return struct.unpack('<b', val)[0]
-    if(len(val) == 2):
+    if (len(val) == 2):
         return struct.unpack('<h', val)[0]
-    if(len(val) == 4):
+    if (len(val) == 4):
         return struct.unpack('<l', val)[0]
-    if(len(val) == 8):
+    if (len(val) == 8):
         return struct.unpack('<q', val)[0]
 
 
 def ReadAttributeHeader(string: bytes, current: int):
-    if(string[current+8] > 0):
+    if (string[current+8] > 0):
         return NonResidentAttributeHeader(
-        type=string[current:current+4].hex(),
-        length=HexLittleEndianToUnsignedDecimal(string[current+4:current+8]),
-        resistent_flag=string[current+8],
-        name_length=string[current+9],
-        name_offset=HexLittleEndianToUnsignedDecimal(string[current+10:current+12]),
-        flags=HexLittleEndianToUnsignedDecimal(string[current+12:current+14]),
-        attribute_id=HexLittleEndianToUnsignedDecimal(string[current+14:current+16]),
-        run_offset=HexLittleEndianToUnsignedDecimal(string[current+32:current+34]),
-        runlist = string[current+72:current+80],
-        real_size=HexLittleEndianToUnsignedDecimal(string[current+48:current+48+8]),
-        allocated_size=HexLittleEndianToUnsignedDecimal(string[current+40:current+40+8]))
+            type=string[current:current+4].hex(),
+            length=HexLittleEndianToUnsignedDecimal(
+                string[current+4:current+8]),
+            resistent_flag=string[current+8],
+            name_length=string[current+9],
+            name_offset=HexLittleEndianToUnsignedDecimal(
+                string[current+10:current+12]),
+            flags=HexLittleEndianToUnsignedDecimal(
+                string[current+12:current+14]),
+            attribute_id=HexLittleEndianToUnsignedDecimal(
+                string[current+14:current+16]),
+            run_offset=HexLittleEndianToUnsignedDecimal(
+                string[current+32:current+34]),
+            runlist=string[current+72:current+80],
+            real_size=HexLittleEndianToUnsignedDecimal(
+                string[current+48:current+48+8]),
+            allocated_size=HexLittleEndianToUnsignedDecimal(string[current+40:current+40+8]))
     else:
         return ResidentAttributeHeader(
-        type=string[current:current+4].hex(),
-        length=HexLittleEndianToUnsignedDecimal(string[current+4:current+8]),
-        resistent_flag=string[current+8],
-        name_length=string[current+9],
-        name_offset=string[current+10:current+12],
-        flags=string[current+12:current+14],
-        attribute_id=string[current+14:current+15],
-        length_of_attribute=HexLittleEndianToUnsignedDecimal(
-            string[current+16:current+20]),
-        offset_to_attribute=HexLittleEndianToUnsignedDecimal(
-            string[current+20:current+22]),
-        indexed_flag=0)
+            type=string[current:current+4].hex(),
+            length=HexLittleEndianToUnsignedDecimal(
+                string[current+4:current+8]),
+            resistent_flag=string[current+8],
+            name_length=string[current+9],
+            name_offset=string[current+10:current+12],
+            flags=string[current+12:current+14],
+            attribute_id=string[current+14:current+15],
+            length_of_attribute=HexLittleEndianToUnsignedDecimal(
+                string[current+16:current+20]),
+            offset_to_attribute=HexLittleEndianToUnsignedDecimal(
+                string[current+20:current+22]),
+            indexed_flag=0)
 
 
 def ReadAttribute30(string: bytes, current: int) -> Attribute30:
@@ -88,7 +106,7 @@ def ReadAttribute30(string: bytes, current: int) -> Attribute30:
     filename_length = string[current+header.offset_to_attribute+64]
     filename = string[current+header.offset_to_attribute+66:current +
                       header.offset_to_attribute+header.length_of_attribute]
-    if(filename.decode("utf-16le").startswith("$")):
+    if (filename.decode("utf-16le").startswith("$")):
         return None
     a30 = Attribute30(
         header=header,
@@ -96,6 +114,7 @@ def ReadAttribute30(string: bytes, current: int) -> Attribute30:
         filename=filename.decode("utf-16le")
     )
     return a30
+
 
 def ReadIndexEntry(string, cur) -> IndexEntry:
     return IndexEntry(
@@ -112,6 +131,7 @@ def ReadIndexEntry(string, cur) -> IndexEntry:
         length_of_filename=string[cur+80],
         filename=string[cur+82:cur+82+string[cur+80]*2].decode("utf-16le")
     )
+
 
 def ReadAttribute90(string: bytes, current: int) -> Attribute90:
     header = ReadAttributeHeader(string, current)
@@ -133,11 +153,11 @@ def ReadAttribute90(string: bytes, current: int) -> Attribute90:
         allocated_size=HexLittleEndianToUnsignedDecimal(string[cur+8:cur+12]),
         has_subnode_flag=string[cur+12]
     )
-    if(index_header.has_subnode_flag != 0):
+    if (index_header.has_subnode_flag != 0):
         return None
     cur += 16
     while (cur + 32 + 16 < current + header.length - 8):
-        index_entry = ReadIndexEntry(string,cur)
+        index_entry = ReadIndexEntry(string, cur)
         entries.append(index_entry)
         cur += index_entry.length_of_index_entry
     a90 = Attribute90(header=header,
@@ -165,35 +185,39 @@ def readPBSTable(string) -> PartitionBootSector:
         cluster_per_index=HexLittleEndianToUnsignedDecimal(string[68:68+4]),
         volume_serial_number=string[72:72+8].hex())
 
+
 def ReadFileText(string, current, i):
-    header = ReadAttributeHeader(string,current)
-    if(header.resistent_flag == 0):
-        if(header.length_of_attribute % 2 != 0):
-            header.length_of_attribute+=1
-        return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8",errors='replace')
+    header = ReadAttributeHeader(string, current)
+    if (header.resistent_flag == 0):
+        if (header.length_of_attribute % 2 != 0):
+            header.length_of_attribute += 1
+        return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8", errors='replace')
     else:
         offset = string[current+header.run_offset: current+header.run_offset+8]
         first_cluster = ParseRunData(offset)[2]
         print(i)
         tmp.seek(first_cluster*8*512)
-        if(header.real_size%2!=0):
-            header.real_size+=1
+        if (header.real_size % 2 != 0):
+            header.real_size += 1
         temp = tmp.read(1024*header.allocated_size)
         tmp.seek(i)
         return temp[0:header.real_size].decode("utf-8", errors='replace')
 
+
 def isDirectory(string, current):
-    if(string[current+8] > 0):
+    if (string[current+8] > 0):
         return False
-    if(string[current+24:current+24+8].decode("utf-16le") == "$I30"):
+    if (string[current+24:current+24+8].decode("utf-16le") == "$I30"):
         return True
 
+
 def hasIndexEntry(string, current):
-    if(string[current]):
+    if (string[current]):
         pass
 
+
 def ReadNode() -> list[Node]:
-    lists:list[Node] = []
+    lists: list[Node] = []
     tmp.seek(0)
     string = tmp.read(1024)
     pbstable = readPBSTable(string)
@@ -201,41 +225,42 @@ def ReadNode() -> list[Node]:
         pbstable.bytes_per_sector + pbstable.bytes_per_file_record_segment*26
     skipped = 0
     while True:
-        if(skipped >= 100):
+        if (skipped >= 100):
             break
         tmp.seek(i)
         i += 1024
         string = tmp.read(1024)
         string = tmp.read(pbstable.bytes_per_file_record_segment)
-        if(string[0:4] == b'FILE'):
+        if (string[0:4] == b'FILE'):
             first_attribute = HexLittleEndianToUnsignedDecimal(string[20:21])
             attribute_type = HexLittleEndianToSignedDecimal(
                 string[first_attribute:first_attribute+4])
             current = first_attribute
             id = HexLittleEndianToUnsignedDecimal(string[44:44+4])
-            children_id:list[int] = []
+            children_id: list[int] = []
             while True:
-                if(string[current:current+4] == b'\xff\xff\xff\xff'):
+                if (string[current:current+4] == b'\xff\xff\xff\xff'):
                     break
                 attribute_type = HexLittleEndianToSignedDecimal(
                     string[current:current+4])
-                if(attribute_type == 144):
+                if (attribute_type == 144):
                     a90 = ReadAttribute90(string, current)
-                    if(a90 == None):
+                    if (a90 == None):
                         break
-                    if(string[current+12] != 0):
+                    if (string[current+12] != 0):
                         break
-                    if(a90.index_entries != None):
+                    if (a90.index_entries != None):
                         for e in a90.index_entries:
-                            children_id.append(e.file_ref)            
+                            children_id.append(e.file_ref)
                     current += a90.header.length
                 else:
                     current += ReadAttributeHeader(string, current).length
-            
-            lists.append(Node(id,children_id,i))
-        if(i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
+
+            lists.append(Node(id, children_id, i))
+        if (i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
             break
     return lists
+
 
 def Read() -> list[File]:
     files: list[File] = []
@@ -246,13 +271,13 @@ def Read() -> list[File]:
         pbstable.bytes_per_sector + pbstable.bytes_per_file_record_segment*26
     skipped = 0
     while True:
-        if(skipped >= 100):
+        if (skipped >= 100):
             break
         tmp.seek(i)
         i += 1024
         string = tmp.read(1024)
         string = tmp.read(pbstable.bytes_per_file_record_segment)
-        if(string[0:4] == b'FILE'):
+        if (string[0:4] == b'FILE'):
             first_attribute = HexLittleEndianToUnsignedDecimal(string[20:21])
             attribute_type = HexLittleEndianToSignedDecimal(
                 string[first_attribute:first_attribute+4])
@@ -262,71 +287,79 @@ def Read() -> list[File]:
             id = HexLittleEndianToUnsignedDecimal(string[44:44+4])
             file_id_array: list[int] = []
             for f in files:
-                if(f.index):
+                if (f.index):
                     for e in f.index.index_entries:
                         file_id_array.append(e.file_ref)
-            if(id in file_id_array):
+            if (id in file_id_array):
                 continue
             while True:
-                if(string[current:current+4] == b'\xff\xff\xff\xff' or current > 1024 - first_attribute):
+                if (string[current:current+4] == b'\xff\xff\xff\xff' or current > 1024 - first_attribute):
                     break
                 attribute_type = HexLittleEndianToSignedDecimal(
                     string[current:current+4])
-                if(attribute_type == 48):
+                if (attribute_type == 48):
                     a30 = ReadAttribute30(string, current)
-                    if(a30 == None):
+                    if (a30 == None):
                         skipped += 1
                         break
                     current += a30.header.length
-                    if(a30.filename[-3:] == "txt"):
-                        print(ReadFileText(string, current,i))
-                elif(attribute_type == 144):
+                    if (a30.filename[-3:] == "txt"):
+                        print(ReadFileText(string, current, i))
+                elif (attribute_type == 144):
                     a90 = ReadAttribute90(string, current)
-                    if(a90 == None):
+                    if (a90 == None):
                         break
                     current += a90.header.length
-                elif(attribute_type == 128):
-                    current += ReadAttributeHeader(string, current).length    
+                elif (attribute_type == 128):
+                    current += ReadAttributeHeader(string, current).length
                 else:
                     current += ReadAttributeHeader(string, current).length
-            if(a30 != None or a90 != None):
+            if (a30 != None or a90 != None):
                 files.append(File(a30, a90))
-        if(i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
+        if (i >= pbstable.total_sectors*pbstable.bytes_per_sector*0.5):
             break
     return files
+
 
 def gather_mft_id():
     '''
     this function gather all the mft id and its children's id
     '''
-    tmp_fd = os.open(r'\\.\F:', os.O_RDONLY | os.O_BINARY)
-    ptr = os.fdopen(tmp_fd,'rb')
-    
-    mft_id_list:list[Node] = []
-    sector_no = 0
-   
-    while sector_no < 2097152:
+    tmp_fd = os.open(r'\\.\D:', os.O_RDONLY | os.O_BINARY)
+    ptr = os.fdopen(tmp_fd, 'rb')
+
+    mft_id_list: list[Node] = []
+    sector_no = 6291456
+
+    while sector_no < 6294280:
         ptr.seek(sector_no * 512)
         buffer = ptr.read(512)
-        if buffer[0:4] != b'FILE': #this sector is not an mft file
+        if buffer[0:4] != b'FILE':  # this sector is not an mft file
             sector_no += 1
             continue
 
         # this sector is an mft file
+        ptr.seek(sector_no * 512)
         buffer = ptr.read(1024)
         this_id = HexLittleEndianToUnsignedDecimal(buffer[44:48])
         children: list[int] = []
 
-        #determine if this_id has already existed in mtf_id_list or not
+        if this_id == 67:
+            pass
+
+        # determine if this_id has already existed in mtf_id_list or not
         isExist = False
         for i in mft_id_list:
             if i.this_id == this_id:
                 isExist = True
                 break
-        
-        #if this mft is not for a folder, move on
+
+        # if this mft is not for a folder, move on
         flag = HexLittleEndianToUnsignedDecimal(buffer[22:24])
-        if 0 <= flag and flag <= 2: #true if not a folder
+        if flag != 3:  # true if not a folder
+            if flag != 1:
+                sector_no += 2
+                continue
             if isExist == True:
                 for i in mft_id_list:
                     if i.this_id == this_id:
@@ -341,35 +374,45 @@ def gather_mft_id():
             sector_no += 2
             continue
 
-        #so this mft is for a folder
-        #go to attribute90
+        # so this mft is for a folder
+        # go to attribute90
         curr_offset = HexLittleEndianToUnsignedDecimal(buffer[20:22])
         while True:
-            attr_signature = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
+            attr_signature = HexLittleEndianToUnsignedDecimal(
+                buffer[curr_offset:curr_offset+4])
             if attr_signature == 144:
                 break
 
-            curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
+            curr_offset += HexLittleEndianToUnsignedDecimal(
+                buffer[curr_offset+4:curr_offset+8])
 
-        #if index entry is in this mft or outside
-        flag_offset = curr_offset + HexLittleEndianToUnsignedDecimal(buffer[curr_offset+20:curr_offset+22]) + 28
-        flag = HexLittleEndianToUnsignedDecimal(buffer[flag_offset:flag_offset+1])
-        curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+20:curr_offset+22])
+        # if index entry is in this mft or outside
+        flag_offset = curr_offset + \
+            HexLittleEndianToUnsignedDecimal(
+                buffer[curr_offset+20:curr_offset+22]) + 28
+        flag = HexLittleEndianToUnsignedDecimal(
+            buffer[flag_offset:flag_offset+1])
 
-        if flag == 0: #mft entry inside this mft record
-            attr_size = HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
+        if flag == 0:  # mft entry inside this mft record
+            attr_size = HexLittleEndianToUnsignedDecimal(
+                buffer[curr_offset+4:curr_offset+8])
             max_offset = curr_offset + attr_size
+            curr_offset += HexLittleEndianToUnsignedDecimal(
+                buffer[curr_offset+20:curr_offset+22])
             curr_offset += 32
 
             while curr_offset + 16 < max_offset:
-                child_id = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
-                check_this_id = HexLittleEndianToUnsignedDecimal(buffer[curr_offset+16:curr_offset+20])
+                child_id = HexLittleEndianToUnsignedDecimal(
+                    buffer[curr_offset:curr_offset+4])
+                check_this_id = HexLittleEndianToUnsignedDecimal(
+                    buffer[curr_offset+16:curr_offset+20])
                 if check_this_id != this_id:
                     break
                 children.append(child_id)
-                curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+8:curr_offset+10])
+                curr_offset += HexLittleEndianToUnsignedDecimal(
+                    buffer[curr_offset+8:curr_offset+10])
 
-            #write info to mtf_id_list
+            # write info to mtf_id_list
             if isExist == True:
                 for i in mft_id_list:
                     if i.this_id == this_id:
@@ -381,43 +424,50 @@ def gather_mft_id():
                 node.children_id = children
                 node.sector = sector_no
                 mft_id_list.append(node)
-        
-        #mft entry outside this mft record
-        else: 
-            #find AttributeA0 and get datarun data
+
+        # mft entry outside this mft record
+        else:
+            # find AttributeA0 and get datarun data
             while True:
-                attr_signature = HexLittleEndianToUnsignedDecimal(buffer[curr_offset:curr_offset+4])
+                attr_signature = HexLittleEndianToUnsignedDecimal(
+                    buffer[curr_offset:curr_offset+4])
                 if attr_signature == 160:
                     break
 
-                curr_offset += HexLittleEndianToUnsignedDecimal(buffer[curr_offset+4:curr_offset+8])
+                curr_offset += HexLittleEndianToUnsignedDecimal(
+                    buffer[curr_offset+4:curr_offset+8])
 
-            datarun_offset = curr_offset + HexLittleEndianToUnsignedDecimal(buffer[curr_offset+ 32:curr_offset+34])
+            datarun_offset = curr_offset + \
+                HexLittleEndianToUnsignedDecimal(
+                    buffer[curr_offset + 32:curr_offset+34])
             datarun = ParseRunData(buffer[datarun_offset:datarun_offset+8])
 
-            #datarun data
+            # datarun data
             cluster_max = datarun[1]
             cluster_start = datarun[2]
 
-            #gether ID at INDX sector
+            # gether ID at INDX sector
             cluster_count = 0
 
-            while cluster_count < cluster_max: #each cluster loop
+            while cluster_count < cluster_max:  # each cluster loop
                 ptr.seek((cluster_start+cluster_count)*8*512)
                 temp_buffer = ptr.read(512*8)
 
                 temp_offset = 64
-                while temp_offset < 512*8: #each index entry loop
-                    child = HexLittleEndianToUnsignedDecimal(temp_buffer[temp_offset:temp_offset+4])
-                    check_this_id = HexLittleEndianToUnsignedDecimal(temp_buffer[temp_offset+16:temp_offset+20])
+                while temp_offset < 512*8:  # each index entry loop
+                    child = HexLittleEndianToUnsignedDecimal(
+                        temp_buffer[temp_offset:temp_offset+4])
+                    check_this_id = HexLittleEndianToUnsignedDecimal(
+                        temp_buffer[temp_offset+16:temp_offset+20])
                     if check_this_id != this_id:
                         break
                     children.append(child)
-                    temp_offset += HexLittleEndianToUnsignedDecimal(temp_buffer[temp_offset+8:temp_offset+10])
-            
+                    temp_offset += HexLittleEndianToUnsignedDecimal(
+                        temp_buffer[temp_offset+8:temp_offset+10])
+
                 cluster_count += 1
 
-            #write info to mtf_id_list
+            # write info to mtf_id_list
             if isExist == True:
                 for i in mft_id_list:
                     if i.this_id == this_id:
@@ -429,17 +479,32 @@ def gather_mft_id():
                 node.children_id = children
                 node.sector = sector_no
                 mft_id_list.append(node)
-             
 
+        # add this_is to children's parent_id
+        for i in children:
+            isExist = False
+            for j in mft_id_list:
+                if j.this_id == i:
+                    j.parent_id = this_id
+                    isExist = True
+                    break
+
+            if isExist == False:
+                node = Node(i)
+                node.parent_id = this_id
+                mft_id_list.append(node)
 
         sector_no += 2
 
     return mft_id_list
 
-def printtest(tmp:list[Node]):
+
+def printtest(tmp: list[Node]):
     for i in tmp:
-        print("ID: ", i.id, " parent ID: ", i.parent_id)
-        print("Children: ", i.children)
+        print("ID:", i.this_id, "----- Parent ID:",
+              i.parent_id, "----- Sector:", i.sector)
+        print("Children: ", i.children_id)
+
 
 test = gather_mft_id()
 printtest(test)
