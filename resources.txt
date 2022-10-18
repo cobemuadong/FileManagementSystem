@@ -7,3 +7,4 @@ https://flatcap.github.io/linux-ntfs/ntfs/concepts/index_entry.html
 https://sabercomlogica.com/en/ntfs-resident-and-non-resident-named-attributes/
 http://ntfs.com/ntfs-files-types.htm
 http://iamtoet.blogspot.com/2014/06/file-system-forensics-ntfs-concepts.html
+http://www.c-jump.com/bcc/t256t/Week04NtfsReview/Week04NtfsReview.html
