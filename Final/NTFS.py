@@ -315,61 +315,31 @@ class NTFS:
             return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
         
         return ""
-    
-    def get_mft_sector(self, id):
-        """
-        returns the mft sector_no of input id
-        """
-        for i in self.mft_id_list:
-            if i.this_id == id:
-                return i.sector
 
-    def print_path(self, list_id: list[int]):
-        """
-        print the name path of the input list_id 
-        """
-        print("\n" + self.volume[4] + ":", end="")
-        for i in range(1, len(list_id)):
-            print(
-                "\\" + self.ReadFileName(self.get_mft_sector(list_id[i])), end="")
-
-        print(">", end="")
-
-    def is_hidden(self, sector) -> bool:
-        '''
-        check if this mft record is set to be hidden to user
-        '''
+    def ReadSize(self, sector:int):
         tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
+
+        tmp_ptr.seek(sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
-
-        # get to attribute 0x10
-        offset = to_dec_le(buffer[20:22])  # seek to attribute header
-        # seek to attribute content
-        offset += to_dec_le(buffer[offset+20:offset+22])
-
-        file_permission = to_dec_le(buffer[offset+32:offset+33])
-        if file_permission in [2, 3, 6, 7, 10, 11, 14, 15]:
-            return True
-
-        return False
-
-    def is_directory(self, sector) -> bool:
-        '''
-        check if this mft record is for a directory
-        '''
-        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
-        tmp_ptr = os.fdopen(tmp_fd, 'rb')
-        tmp_ptr.seek(sector*self.byte_per_sector)
-        buffer = tmp_ptr.read(self.mft_size_byte)
-
-        flag = to_dec_le(buffer[22:24])
-        if flag == 3:
-            return True
-
-        return False
-
+        current = 0
+        current = to_dec_le(buffer[20:22])
+        attr_signature = 0
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 128:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        if(attr_signature != 128):
+            return -1
+        header = ReadAttributeHeader(buffer, current)
+        if(header.resident_flag == 0):
+            return header.length_of_attribute
+        else:
+            return header.real_size
 
     def ReadFilePermission(self, sector:int):
         file_permission_table = {
@@ -511,6 +481,60 @@ class NTFS:
                         return
 
         print("\tNo such file")
+    
+    def get_mft_sector(self, id):
+        """
+        returns the mft sector_no of input id
+        """
+        for i in self.mft_id_list:
+            if i.this_id == id:
+                return i.sector
+
+    def print_path(self, list_id: list[int]):
+        """
+        print the name path of the input list_id 
+        """
+        print("\n" + self.volume[4] + ":", end="")
+        for i in range(1, len(list_id)):
+            print(
+                "\\" + self.ReadFileName(self.get_mft_sector(list_id[i])), end="")
+
+        print(">", end="")
+
+    def is_hidden(self, sector) -> bool:
+        '''
+        check if this mft record is set to be hidden to user
+        '''
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+
+        # get to attribute 0x10
+        offset = to_dec_le(buffer[20:22])  # seek to attribute header
+        # seek to attribute content
+        offset += to_dec_le(buffer[offset+20:offset+22])
+
+        file_permission = to_dec_le(buffer[offset+32:offset+33])
+        if file_permission in [2, 3, 6, 7, 10, 11, 14, 15]:
+            return True
+
+        return False
+
+    def is_directory(self, sector) -> bool:
+        '''
+        check if this mft record is for a directory
+        '''
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+
+        flag = to_dec_le(buffer[22:24])
+        if flag == 3:
+            return True
+
+        return False
 
     def command_back(self, cmd: str):
         '''
