@@ -244,19 +244,20 @@ class NTFS:
         # os.close(tmp_fd)
         return self.ReadFileText(tmp_ptr, buffer, current)
 
-    def ReadFileText(self, tmp_ptr:BufferedReader, string, current):
+    def ReadFileText(self, tmp_ptr:BufferedReader, string:bytes, current):
         header = ReadAttributeHeader(string, current)
         if (header.resident_flag == 0):
             if (header.length_of_attribute % 2 != 0):
                 header.length_of_attribute += 1
-            return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8", errors='replace')
+            return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute] \
+            .decode("utf-8", errors='replace')
         else:
             datarun = string[current+header.run_offset: current+header.length]
             datarun_list = parse_datarun2(datarun)
             
             if (header.real_size % 2 != 0):
                 header.real_size += 1
-            if(header.real_size <= 1024):
+            if(header.real_size <= self.byte_per_sector*self.cluster_per_index):
                 cluster = datarun_list[0][1]
                 tmp_ptr.seek(cluster*8*512)
                 temp = tmp_ptr.read(1024*header.allocated_size)
@@ -383,7 +384,23 @@ class NTFS:
             return
 
         children_id:list[int] = []
-
+    def ReadFileName(self, buffer:str):
+        #Find attribute $30 $FILE_NAME
+        current = to_dec_le(buffer[20:22])
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 48:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        
+        header = ReadAttributeHeader(buffer, current)
+        if (header.resident_flag == 0):
+            if (header.length_of_attribute % 2 != 0):
+                header.length_of_attribute += 1
+            return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
+        return ""
         curr_id = self.processing_list[len(self.processing_list)-1]
         for i in self.mft_id_list:
             if i.this_id == curr_id:
@@ -522,3 +539,27 @@ class NTFS:
         shell_ptr.close()
         # os.close(shell_fd)
 
+    def ReadSize(self, sector:int):
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+
+        tmp_ptr.seek(sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        current = 0
+        current = to_dec_le(buffer[20:22])
+        attr_signature = 0
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 128:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        if(attr_signature != 128):
+            return -1
+        header = ReadAttributeHeader(buffer, current)
+        if(header.resident_flag == 0):
+            return header.length_of_attribute
+        else:
+            return header.real_size
