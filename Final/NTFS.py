@@ -268,3 +268,8 @@ class NTFS:
                 data.append(buffer[0:byte_read].decode('utf-8', errors = 'ignore'))
                 print(''.join(data))
             return ' '.join(data)
+
+    
+
+
+
