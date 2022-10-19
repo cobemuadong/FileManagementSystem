@@ -166,8 +166,6 @@ class NTFS:
                     temp_buffer = ptr.read(self.sector_per_cluster*self.byte_per_sector)
 
                     temp_offset = to_dec_le(temp_buffer[24:24+4]) + 24 #find the first index entry and plus 18h = 24d
-                    # if this_id == 5:    # $dot record is a bit different
-                    #     temp_offset += 24
                     # each index entry loop
                     while temp_offset < self.sector_per_cluster * self.byte_per_sector:
                         child_id = to_dec_le(temp_buffer[temp_offset:temp_offset+4])
@@ -211,12 +209,14 @@ class NTFS:
 
             sector_no += 2    
 
+        # append 
         for i in self.mft_id_list:
             if i.this_id == 5:
                 i.children_id.append(0)
                 break
 
         self.mft_id_list[0].parent_id = 5
+        os.close(fd)
         
     def ReadFileTextBySector(self ,sector):
         tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
@@ -266,6 +266,5 @@ class NTFS:
                 buffer = tmp_ptr.read(cluster_count*8*512)
                 byte_read = total_byte_left > cluster_count*8*512 and total_byte_left or cluster_count*8*512
                 data.append(buffer[0:byte_read].decode('utf-8', errors = 'ignore'))
+                
             return ''.join(data)
-
-    
