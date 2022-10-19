@@ -1,5 +1,5 @@
 from NTFS import *
 
-a = NTFS("\\\\.\\F:")
+a = NTFS("\\\\.\\E:")
 
 a.start_shell()

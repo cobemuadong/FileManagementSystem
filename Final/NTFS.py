@@ -321,7 +321,6 @@ class NTFS:
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        tmp_ptr.seek(sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
         current = to_dec_le(buffer[20:22])
@@ -357,14 +356,12 @@ class NTFS:
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        tmp_ptr.seek(sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
         current = to_dec_le(buffer[20:22])
         attr_signature = 0
         while current < 1024:
-            attr_signature = to_dec_le(
-                buffer[current:current+4])
+            attr_signature = to_dec_le(buffer[current:current+4])
             if attr_signature == 16:                
                 break
             current += to_dec_le(
@@ -376,7 +373,6 @@ class NTFS:
         if(header.resident_flag == 0):
             permission = bin(to_dec_le(buffer[current+56:current+64])).lstrip('0b')
             for i in range(1,len(permission)+1):
-                print(permission[-i])
                 if(permission[-i] == '1'):
                     file_attr+=file_permission_table[i]
             return file_attr
@@ -395,10 +391,12 @@ class NTFS:
             return
 
         print("\tHere are all available commands\n")
-        print("'ls'\t\t\tShow all file and folder in current directory")
-        print("'cd <dir>'\t\t\tGo to directory")
-        print("'cat <filename>'\t\t\tShow .txt file content")
-        print("'back'\t\t\tGo back to parent directory")
+        print("{:<24}Show all file and folder in current directory".format("'ls'"))
+        print("{:<24}Go to directory".format("'cd <dir>'"))
+        print("{:<24}Show .txt file content".format("'cat <filename.txt>'"))
+        print("{:<24}Go back to parent directory".format("'back'"))
+        print("{:<24}Clear screen".format("'cls'"))
+        print("{:<24}Exit program".format("'exit'"))
 
     def command_ls(self, cmd: str):
         '''
@@ -418,18 +416,18 @@ class NTFS:
 
         # print item(s) in directory
         print("")
-        print("\tSize")
+        print("{:<8}{:<8}{:<16}Name".format("Status","","Size (KB)"))
         for i in children_id:
             sector_no = self.get_mft_sector(i)
             if self.is_hidden(sector_no):
                 continue
             filename = self.ReadFileName(sector_no)
+            print("{:<8}".format(self.ReadFilePermission(sector_no)),end = "")
             if self.is_directory(sector_no):
-                print("<DIR>", end="")
+                print("{:<24}".format("<DIR>"), end="")
             else:
-                print(
-                    "\t" + str(round(self.ReadSize(sector_no)/1024, 2)) + " KB", end="")
-            print("\t\t\t" + filename)
+                print("{:<8}{:<16}".format("",str(round(self.ReadSize(sector_no)/1024, 2))), end="")
+            print(filename)
 
     def command_cd(self, cmd: str):
         '''
