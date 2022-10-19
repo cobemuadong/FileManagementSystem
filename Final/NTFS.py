@@ -223,7 +223,7 @@ class NTFS:
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        self.ptr.seek(sector)
+        tmp_ptr.seek(sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
 
@@ -241,10 +241,9 @@ class NTFS:
 
     def ReadFileText(self, tmp_ptr:BufferedReader, string, current):
         header = ReadAttributeHeader(string, current)
-        if (header.resistent_flag == 0):
+        if (header.resident_flag == 0):
             if (header.length_of_attribute % 2 != 0):
                 header.length_of_attribute += 1
-            os.close(tmp_ptr)    
             return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8", errors='replace')
         else:
             datarun = string[current+header.run_offset: current+header.length]
@@ -267,16 +266,15 @@ class NTFS:
                 buffer = tmp_ptr.read(cluster_count*8*512)
                 byte_read = total_byte_left > cluster_count*8*512 and total_byte_left or cluster_count*8*512
                 data.append(buffer[0:byte_read].decode('utf-8', errors = 'ignore'))
+                print(''.join(data))
+            return ' '.join(data)
 
-            os.close(tmp_ptr)    
-            return ''.join(data)
-    
     def ReadFileName(self, sector):
         tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        self.ptr.seek(sector)
+        tmp_ptr.seek(sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
 
@@ -290,7 +288,12 @@ class NTFS:
             current += to_dec_le(
             buffer[current+4:current+8])
         
-        filename:str
         header = ReadAttributeHeader(buffer, current)
-        return filename
+        if (header.resident_flag == 0):
+            if (header.length_of_attribute % 2 != 0):
+                header.length_of_attribute += 1
+            return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
+        return ""
+
+
 
