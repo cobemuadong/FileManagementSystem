@@ -314,7 +314,14 @@ class NTFS:
             return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
         return ""
 
-    def ReadSize(self, buffer:str):
+    def ReadSize(self, sector:int):
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+
+        tmp_ptr.seek(sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        current = 0
         current = to_dec_le(buffer[20:22])
         attr_signature = 0
         while current < 1024:
