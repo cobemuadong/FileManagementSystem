@@ -49,7 +49,6 @@ class NTFS:
         self.mft_id_list = []
         self.__gather_mft_id()
         tmp_ptr.close()
-        # os.close(tmp_fd)
 
     def printVolumeInformation(self):
         print('----------Volume information---------')
@@ -219,14 +218,12 @@ class NTFS:
 
         self.mft_id_list[0].parent_id = 5
         ptr.close()
-        # os.close(fd)
-        
+                
     def ReadFileTextBySector(self ,sector):
         tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        tmp_ptr.seek(sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
 
@@ -241,7 +238,6 @@ class NTFS:
             buffer[current+4:current+8])
         
         tmp_ptr.close()
-        # os.close(tmp_fd)
         return self.ReadFileText(tmp_ptr, buffer, current)
 
     def ReadFileText(self, tmp_ptr:BufferedReader, string:bytes, current):
@@ -275,12 +271,11 @@ class NTFS:
                 print(''.join(data))
             return ' '.join(data)
 
-    def ReadFileName(self, sector):
+    def ReadFileName(self, sector:int):
         tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        tmp_ptr.seek(sector * self.byte_per_sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
 
@@ -299,11 +294,52 @@ class NTFS:
             if (header.length_of_attribute % 2 != 0):
                 header.length_of_attribute += 1
             tmp_ptr.close()
-            # os.close(tmp_fd)
             return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
         tmp_ptr.close()
-        # os.close(tmp_fd)
         return ""
+
+    def ReadFileName(self, buffer:str):
+        #Find attribute $30 $FILE_NAME
+        current = to_dec_le(buffer[20:22])
+        while current < self.mft_size_byte:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 48:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        
+        header = ReadAttributeHeader(buffer, current)
+        if (header.resident_flag == 0):
+            if (header.length_of_attribute % 2 != 0):
+                header.length_of_attribute += 1
+            return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
+        return ""
+ 
+    def ReadSize(self, sector:int):
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+
+        tmp_ptr.seek(sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        current = 0
+        current = to_dec_le(buffer[20:22])
+        attr_signature = 0
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 128:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        if(attr_signature != 128):
+            return -1
+        header = ReadAttributeHeader(buffer, current)
+        if(header.resident_flag == 0):
+            return header.length_of_attribute
+        else:
+            return header.real_size
 
     def get_mft_sector(self, id):
         """
@@ -399,25 +435,7 @@ class NTFS:
             if self.is_directory(sector_no):
                 print("<DIR>", end = "")
             print("\t" + filename)
-
-    def ReadFileName(self, buffer:str):
-        #Find attribute $30 $FILE_NAME
-        current = to_dec_le(buffer[20:22])
-        while current < 1024:
-            attr_signature = to_dec_le(
-                buffer[current:current+4])
-            if attr_signature == 48:                
-                break
-            current += to_dec_le(
-            buffer[current+4:current+8])
-        
-        header = ReadAttributeHeader(buffer, current)
-        if (header.resident_flag == 0):
-            if (header.length_of_attribute % 2 != 0):
-                header.length_of_attribute += 1
-            return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
-        return ""
-        
+ 
     def command_cd(self, cmd:str):
         '''
         handle 'cd' command
@@ -442,7 +460,6 @@ class NTFS:
                 return
 
         print("\tNo such directory")
-
 
     def command_cat(self, cmd:str):
         '''
@@ -537,29 +554,5 @@ class NTFS:
             self.process_command(command)
 
         shell_ptr.close()
-        # os.close(shell_fd)
 
-    def ReadSize(self, sector:int):
-        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
-        tmp_ptr = os.fdopen(tmp_fd, 'rb')
-        tmp_ptr.seek(sector*self.byte_per_sector)
 
-        tmp_ptr.seek(sector)
-        buffer = tmp_ptr.read(self.mft_size_byte)
-        current = 0
-        current = to_dec_le(buffer[20:22])
-        attr_signature = 0
-        while current < 1024:
-            attr_signature = to_dec_le(
-                buffer[current:current+4])
-            if attr_signature == 128:                
-                break
-            current += to_dec_le(
-            buffer[current+4:current+8])
-        if(attr_signature != 128):
-            return -1
-        header = ReadAttributeHeader(buffer, current)
-        if(header.resident_flag == 0):
-            return header.length_of_attribute
-        else:
-            return header.real_size
