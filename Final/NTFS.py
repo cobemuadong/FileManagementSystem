@@ -1,5 +1,7 @@
+from io import BufferedReader
 import os
 from byte_decode import *
+from AttributeHeader import *
 
 class Node:
     """
@@ -11,6 +13,7 @@ class Node:
 
     def __init__(self, this_id:int):
         self.this_id = this_id
+        
 
 class NTFS:
     """
@@ -29,14 +32,39 @@ class NTFS:
         #get volume basic information
         self.byte_per_sector = to_dec_le(boot_buffer[11:13])
         self.sector_per_cluster = to_dec_le(boot_buffer[13:14])
+        self.reserved_sectors=to_dec_le(boot_buffer[14:14+2])
+        self.media_descriptor=boot_buffer[21:21+1].hex()
         self.sector_per_track = to_dec_le(boot_buffer[24:26])
+        self.numbers_of_heads=to_dec_le(boot_buffer[26:26+2])
+        self.hidden_sectors=to_dec_le(boot_buffer[28:28+4])
         self.total_sectors = to_dec_le(boot_buffer[40:48])
         self.mft_start_cluster = to_dec_le(boot_buffer[48:56])
         self.mftmirr_start_cluster = to_dec_le(boot_buffer[56:64])
         self.mft_size_byte = 2 ** (256 - to_dec_le(boot_buffer[64:68]))
+        self.cluster_per_index=to_dec_le(boot_buffer[68:68+4])
+        self.volume_serial_number=boot_buffer[72:72+8].hex()
         
         self.mft_zone_total_sectors = int(self.total_sectors / 8) + 1
+        self.mft_id_list = []
         self.__gather_mft_id()
+        os.close(tmp_fd)
+
+    def printVolumeInformation(self):
+        print('----------Volume information---------')
+        print('Bytes per sector: ', self.byte_per_sector)
+        print('Sectors per cluster (Sc): ', self.sector_per_cluster)
+        print('Reserved sectors (Sb): ', self.reserved_sectors)
+        print('Media Descriptor: ', self.media_descriptor)
+        print('Sector per track: ', self.sector_per_track)
+        print('Number of heads: ', self.numbers_of_heads)
+        print('Hidden Sectors: ',self.hidden_sectors)
+        print('Total sectors: ',self.total_sectors)
+        print('MFT begin sector: ',self.mft_start_cluster)
+        print('MFT Mirror begin sector: ', self.mftmirr_start_cluster)
+        print('Bytes per File Record Segment: ', self.mft_size_byte)
+        print('Cluster per Index: ', self.cluster_per_index)
+        print('Volume serial number: ', self.volume_serial_number)
+        print('-------------------------------------')
 
     def __gather_mft_id(self):
         fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
@@ -137,9 +165,9 @@ class NTFS:
                     ptr.seek((cluster_start + cluster_count)*self.sector_per_cluster*self.byte_per_sector)
                     temp_buffer = ptr.read(self.sector_per_cluster*self.byte_per_sector)
 
-                    temp_offset = 64
-                    if this_id == 5:    # $dot record is a bit different
-                        temp_offset += 24
+                    temp_offset = to_dec_le(temp_buffer[24:24+4]) + 24 #find the first index entry and plus 18h = 24d
+                    # if this_id == 5:    # $dot record is a bit different
+                    #     temp_offset += 24
                     # each index entry loop
                     while temp_offset < self.sector_per_cluster * self.byte_per_sector:
                         child_id = to_dec_le(temp_buffer[temp_offset:temp_offset+4])
@@ -190,8 +218,55 @@ class NTFS:
 
         self.mft_id_list[0].parent_id = 5
         
+    def ReadFileTextBySector(self ,sector):
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
 
-    
-    
+        self.ptr.seek(sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        current = 0
 
+        #Find attribute $80 $DATA
+        current = to_dec_le(buffer[20:22])
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 128:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        
+        return self.ReadFileText(tmp_ptr, buffer, current)
 
+    def ReadFileText(self, tmp_ptr:BufferedReader, string, current):
+        header = ReadAttributeHeader(string, current)
+        if (header.resistent_flag == 0):
+            if (header.length_of_attribute % 2 != 0):
+                header.length_of_attribute += 1
+            return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8", errors='replace')
+        else:
+            datarun = string[current+header.run_offset: current+header.length]
+            datarun_list = parse_datarun2(datarun)
+            
+            if (header.real_size % 2 != 0):
+                header.real_size += 1
+            if(header.real_size <= 1024):
+                cluster = datarun_list[0][1]
+                tmp_ptr.seek(cluster*8*512)
+                temp = tmp_ptr.read(1024*header.allocated_size)
+                return temp[0:header.real_size].decode("utf-8", errors='replace')
+
+            total_byte_left = header.real_size
+            data = []
+            for index in datarun_list:
+                cluster = index[1]
+                cluster_count = index[0]
+                tmp_ptr.seek(cluster*8*512)
+                buffer = tmp_ptr.read(cluster_count*8*512)
+                byte_read = total_byte_left > cluster_count*8*512 and total_byte_left or cluster_count*8*512
+                data.append(buffer[0:byte_read].decode('utf-8', errors = 'ignore'))
+                print(''.join(data))
+            return ' '.join(data)
+
+a = NTFS(r'\\.\E:')

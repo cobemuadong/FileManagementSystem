@@ -21,3 +21,22 @@ def parse_datarun(val: bytes):
     first_cluster = to_dec_le(val[1+digit_2:1+digit_2+digit_1])
 
     return (size_byte, cluster_count_byte, first_cluster)
+
+
+def parse_datarun2(string: str):
+    data_run = []
+    current = 0
+    temp = 0
+    while(current < len(string)):
+        if(string[current]==0):
+            break
+        digit_1 = int(string.hex()[current*2])
+        digit_2 = int(string.hex()[current*2+1])
+        cluster_count_byte = to_dec_le(string[1+current:1+current+digit_2])
+        first_cluster = to_dec_le(string[1+current+digit_2:1+current+digit_2+digit_1]) + temp
+        temp = first_cluster
+        current+=digit_1+digit_2+1
+        data_run.append([cluster_count_byte,first_cluster])
+
+    return data_run
+
