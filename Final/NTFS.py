@@ -20,6 +20,7 @@ class NTFS:
     Lớp cho volume NTFS và các hàm để xử lý lớp này
     """
     mft_id_list:list[Node] = []
+    processing_list:list[int] = []
 
     def __init__(self, volume:str):
         self.volume = volume
@@ -47,7 +48,8 @@ class NTFS:
         self.mft_zone_total_sectors = int(self.total_sectors / 8) + 1
         self.mft_id_list = []
         self.__gather_mft_id()
-        os.close(tmp_fd)
+        tmp_ptr.close()
+        # os.close(tmp_fd)
 
     def printVolumeInformation(self):
         print('----------Volume information---------')
@@ -216,7 +218,8 @@ class NTFS:
                 break
 
         self.mft_id_list[0].parent_id = 5
-        os.close(fd)
+        ptr.close()
+        # os.close(fd)
         
     def ReadFileTextBySector(self ,sector):
         tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
@@ -237,6 +240,8 @@ class NTFS:
             current += to_dec_le(
             buffer[current+4:current+8])
         
+        tmp_ptr.close()
+        # os.close(tmp_fd)
         return self.ReadFileText(tmp_ptr, buffer, current)
 
     def ReadFileText(self, tmp_ptr:BufferedReader, string, current):
@@ -274,7 +279,7 @@ class NTFS:
         tmp_ptr = os.fdopen(tmp_fd, 'rb')
         tmp_ptr.seek(sector*self.byte_per_sector)
 
-        tmp_ptr.seek(sector)
+        tmp_ptr.seek(sector * self.byte_per_sector)
         buffer = tmp_ptr.read(self.mft_size_byte)
         current = 0
 
@@ -292,8 +297,228 @@ class NTFS:
         if (header.resident_flag == 0):
             if (header.length_of_attribute % 2 != 0):
                 header.length_of_attribute += 1
+            tmp_ptr.close()
+            # os.close(tmp_fd)
             return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
+        tmp_ptr.close()
+        # os.close(tmp_fd)
         return ""
 
+    def get_mft_sector(self, id):
+        """
+        returns the mft sector_no of input id
+        """
+        for i in self.mft_id_list:
+            if i.this_id == id:
+                return i.sector
+    
+    def print_path(self,list_id:list[int]):
+        """
+        print the name path of the input list_id 
+        """
+        print("\n" + self.volume[4] + ":", end = "")
+        for i in range(1,len(list_id)):
+            print("\\" + self.ReadFileName(self.get_mft_sector(list_id[i])), end = "")
 
+        print(">", end = "")
+
+    def is_hidden(self,sector) -> bool:
+        '''
+        check if this mft record is set to be hidden to user
+        '''
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+
+        #get to attribute 0x10
+        offset = to_dec_le(buffer[20:22]) #seek to attribute header
+        offset += to_dec_le(buffer[offset+20:offset+22]) #seek to attribute content
+        
+        file_permission = to_dec_le(buffer[offset+32:offset+33])
+        if file_permission in [2,3,6,7,10,11,14,15]:
+            return True
+
+        return False
+
+    def is_directory(self,sector) -> bool:
+        '''
+        check if this mft record is for a directory
+        '''
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+
+        flag = to_dec_le(buffer[22:24])
+        if flag == 3:
+            return True
+
+        return False
+
+    def command_help(self, cmd:str):
+        """
+        handle 'help' command
+        """
+        command = cmd.split()
+        if len(command) > 1:
+            print("'" + cmd + "' is not a valid 'help' command,")
+            print("try typing 'help'")
+            return
+        
+        print("\tHere are all available commands\n")
+        print("'ls'\t\t\tShow all file and folder in current directory")
+        print("'cd <dir>'\t\t\tGo to directory")
+        print("'cat <filename>'\t\t\tShow .txt file content")
+        print("'back'\t\t\tGo back to parent directory")
+        
+    def command_ls(self, cmd:str):
+        '''
+        handle ls command
+        '''
+        command = cmd.split()
+        if len(command) > 1:
+            print("'" + cmd + "' is not a valid 'ls' command,")
+            print("try typing only 'ls'")
+            return
+
+        children_id:list[int] = []
+
+        curr_id = self.processing_list[len(self.processing_list)-1]
+        for i in self.mft_id_list:
+            if i.this_id == curr_id:
+                children_id = i.children_id
+
+        # print item(s) in directory
+        print("")
+        for i in children_id:
+            sector_no = self.get_mft_sector(i)
+            if self.is_hidden(sector_no):
+                continue
+            filename = self.ReadFileName(sector_no)
+            if self.is_directory(sector_no):
+                print("<DIR>", end = "")
+            print("\t" + filename)
+
+    def command_cd(self, cmd:str):
+        '''
+        handle 'cd' command
+        '''
+        des = cmd[3:len(cmd)]
+        if (des[0] == des[len(des)-1]) and (ord(des[0]) in [34,39]):
+            des = des[1:len(des)-1]
+        
+        #get current directory children id
+        children_id = []
+        for i in self.mft_id_list:
+            if i.this_id == self.processing_list[len(self.processing_list)-1]:
+                children_id = i.children_id
+
+        for i in children_id:
+            sector_no = self.get_mft_sector(i)
+            if self.ReadFileName(sector_no) == des:
+                if self.is_directory(sector_no):
+                    self.processing_list.append(i)
+                else:
+                    print("\t'" + des +"' is not a directory")
+                return
+
+        print("\tNo such directory")
+
+
+    def command_cat(self, cmd:str):
+        '''
+        handle 'cat' command
+        '''
+        file_name = cmd[4:len(cmd)]
+        if (file_name[0] == file_name[len(file_name)-1]) and (ord(file_name[0]) in [34,39]):
+            file_name = file_name[1:len(file_name)-1]
+
+        if file_name[len(file_name)-4:len(file_name)] != ".txt":
+            print("Can only read '.txt' files,")
+            print("try using other application to read this file")
+            return
+
+        for i in self.mft_id_list:
+            if i.this_id == self.processing_list[len(self.processing_list)-1]:
+                for j in i.children_id:
+                    if self.ReadFileName(self.get_mft_sector(j)) == file_name:
+                        if self.is_directory(self.get_mft_sector(j)) == False:
+                            self.ReadFileTextBySector(self.get_mft_sector(j))
+                        else:
+                            print("'" + file_name + "' is not a .txt file")                
+                        return
+
+        print("\tNo such file" )
+
+
+            
+
+    def command_back(self, cmd:str):
+        '''
+        handle 'back' command
+        '''
+        command = cmd.split()
+        if len(command) > 1:
+            print("'" + cmd + "' is not a valid 'back' command,")
+            print(" try typing only 'back'")
+            return
+
+        if len(self.processing_list) <= 1:
+            print("Already root directory!")
+            return
+
+        self.processing_list.pop()       
+    
+    def command_cls(self, cmd:str):
+        command = cmd.split()
+        if len(command) > 1:
+            print("'" + cmd + "' is not a valid 'cls' command,")
+            print(" try typing only 'cls'")
+            return
+
+        os.system('cls')
+
+    def process_command(self, cmd:str):
+        command = cmd.split()
+
+        if command[0] not in ["help","ls","cd","cat","back","cls"]:
+            print("'" + command[0] + "' is not recognized as a valid command,")
+            print("try typing 'help' to show all valid command")
+            return
+
+        if command[0] == "help":
+            self.command_help(cmd)
+        elif command[0] == "ls":
+            self.command_ls(cmd)
+        elif command[0] == "cd":
+            self.command_cd(cmd)
+        elif command[0] == "cat":
+            self.command_cat(cmd)
+        elif command[0] == "back":
+            self.command_back(cmd)
+        elif command[0] == "cls":
+            self.command_cls(cmd)
+            
+
+    def start_shell(self):
+        """
+        browse volume with command
+        """
+        shell_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        shell_ptr = os.fdopen(shell_fd, 'rb')
+
+        self.processing_list = [5]
+        command = " "
+
+        while True:
+            self.print_path(self.processing_list)
+            command = input()
+            if command == "exit":
+                print("Exiting program!")
+                break
+            self.process_command(command)
+
+        shell_ptr.close()
+        # os.close(shell_fd)
 
