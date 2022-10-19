@@ -338,3 +338,44 @@ class NTFS:
             return header.length_of_attribute
         else:
             return header.real_size
+
+    def ReadFilePermission(self, sector:int):
+        file_permission_table = {
+            0: 'R',
+            1: 'H',
+            2: 'S',
+            5: 'A',
+            6: 'D',
+            7: 'N',
+            8: 'T'
+        }
+    
+        #Find attribute $10
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+
+        tmp_ptr.seek(sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        current = 0
+        current = to_dec_le(buffer[20:22])
+        attr_signature = 0
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 16:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        if(attr_signature != 128):
+            return -1
+        header = ReadAttributeHeader(buffer, current)
+        file_attr = ''
+        if(header.resident_flag == 0):
+            permission = bin(int(buffer[current+56:current+64].hex(), base=16)).lstrip('0b')
+            for i in range(0,len(permission)):
+                if(permission[i] == 1):
+                    file_attr+=file_permission_table[i]
+            return file_attr
+        else:
+            return -1
