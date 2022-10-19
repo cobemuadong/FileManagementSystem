@@ -244,6 +244,7 @@ class NTFS:
         if (header.resistent_flag == 0):
             if (header.length_of_attribute % 2 != 0):
                 header.length_of_attribute += 1
+            os.close(tmp_ptr)    
             return string[current+header.offset_to_attribute: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-8", errors='replace')
         else:
             datarun = string[current+header.run_offset: current+header.length]
@@ -266,5 +267,31 @@ class NTFS:
                 buffer = tmp_ptr.read(cluster_count*8*512)
                 byte_read = total_byte_left > cluster_count*8*512 and total_byte_left or cluster_count*8*512
                 data.append(buffer[0:byte_read].decode('utf-8', errors = 'ignore'))
-                
+
+            os.close(tmp_ptr)    
             return ''.join(data)
+    
+    def ReadFileName(self, sector):
+        tmp_fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
+        tmp_ptr = os.fdopen(tmp_fd, 'rb')
+        tmp_ptr.seek(sector*self.byte_per_sector)
+
+        self.ptr.seek(sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        current = 0
+
+        #Find attribute $30 $FILE_NAME
+        current = to_dec_le(buffer[20:22])
+        while current < 1024:
+            attr_signature = to_dec_le(
+                buffer[current:current+4])
+            if attr_signature == 48:                
+                break
+            current += to_dec_le(
+            buffer[current+4:current+8])
+        
+        filename:str
+        header = ReadAttributeHeader(buffer, current)
+
+        return filename
+
