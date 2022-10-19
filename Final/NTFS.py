@@ -311,7 +311,8 @@ class NTFS:
         if (header.resident_flag == 0):
             if (header.length_of_attribute % 2 != 0):
                 header.length_of_attribute += 1
-            return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
+            return buffer[current+header.offset_to_attribute+66: 
+            current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
         return ""
 
     def ReadSize(self, sector:int):
