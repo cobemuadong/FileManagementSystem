@@ -367,14 +367,14 @@ class NTFS:
                 break
             current += to_dec_le(
             buffer[current+4:current+8])
-        if(attr_signature != 128):
+        if(attr_signature != 16):
             return -1
         header = ReadAttributeHeader(buffer, current)
         file_attr = ''
         if(header.resident_flag == 0):
             permission = bin(int(buffer[current+56:current+64].hex(), base=16)).lstrip('0b')
-            for i in range(0,len(permission)):
-                if(permission[i] == 1):
+            for i in range(0,8):
+                if(permission[i] == '1'):
                     file_attr+=file_permission_table[i]
             return file_attr
         else:
