@@ -292,6 +292,5 @@ class NTFS:
         
         filename:str
         header = ReadAttributeHeader(buffer, current)
-
         return filename
 
