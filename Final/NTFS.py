@@ -372,9 +372,10 @@ class NTFS:
         header = ReadAttributeHeader(buffer, current)
         file_attr = ''
         if(header.resident_flag == 0):
-            permission = bin(int(buffer[current+56:current+64].hex(), base=16)).lstrip('0b')
-            for i in range(0,8):
-                if(permission[i] == '1'):
+            permission = bin(to_dec_le(buffer[current+56:current+64])).lstrip('0b')
+            for i in range(1,len(permission)+1):
+                print(permission[-i])
+                if(permission[-i] == '1'):
                     file_attr+=file_permission_table[i]
             return file_attr
         else:
