@@ -384,6 +384,22 @@ class NTFS:
             return
 
         children_id:list[int] = []
+        curr_id = self.processing_list[len(self.processing_list)-1]
+        for i in self.mft_id_list:
+            if i.this_id == curr_id:
+                children_id = i.children_id
+
+        # print item(s) in directory
+        print("")
+        for i in children_id:
+            sector_no = self.get_mft_sector(i)
+            if self.is_hidden(sector_no):
+                continue
+            filename = self.ReadFileName(sector_no)
+            if self.is_directory(sector_no):
+                print("<DIR>", end = "")
+            print("\t" + filename)
+
     def ReadFileName(self, buffer:str):
         #Find attribute $30 $FILE_NAME
         current = to_dec_le(buffer[20:22])
@@ -401,22 +417,7 @@ class NTFS:
                 header.length_of_attribute += 1
             return buffer[current+header.offset_to_attribute+66: current+header.offset_to_attribute+header.length_of_attribute].decode("utf-16le", errors='replace')
         return ""
-        curr_id = self.processing_list[len(self.processing_list)-1]
-        for i in self.mft_id_list:
-            if i.this_id == curr_id:
-                children_id = i.children_id
-
-        # print item(s) in directory
-        print("")
-        for i in children_id:
-            sector_no = self.get_mft_sector(i)
-            if self.is_hidden(sector_no):
-                continue
-            filename = self.ReadFileName(sector_no)
-            if self.is_directory(sector_no):
-                print("<DIR>", end = "")
-            print("\t" + filename)
-
+        
     def command_cd(self, cmd:str):
         '''
         handle 'cd' command
@@ -468,9 +469,6 @@ class NTFS:
 
         print("\tNo such file" )
 
-
-            
-
     def command_back(self, cmd:str):
         '''
         handle 'back' command
@@ -488,6 +486,9 @@ class NTFS:
         self.processing_list.pop()       
     
     def command_cls(self, cmd:str):
+        '''
+        handle clear screen command
+        '''
         command = cmd.split()
         if len(command) > 1:
             print("'" + cmd + "' is not a valid 'cls' command,")
@@ -516,7 +517,6 @@ class NTFS:
             self.command_back(cmd)
         elif command[0] == "cls":
             self.command_cls(cmd)
-            
 
     def start_shell(self):
         """
