@@ -46,8 +46,19 @@ class NTFS:
         self.cluster_per_index = to_dec_le(boot_buffer[68:68+4])
         self.volume_serial_number = boot_buffer[72:72+8].hex()
 
-        self.mft_zone_total_sectors = int(self.total_sectors / 8) + 1
-        self.mft_id_list = []
+        #find total mft
+        tmp_ptr.seek(self.mft_start_cluster*self.sector_per_cluster*self.byte_per_sector)
+        buffer = tmp_ptr.read(self.mft_size_byte)
+        offset = to_dec_le(buffer[20:22])
+        while offset < self.mft_size_byte: # go to attribute 0x80
+            attr_signature = to_dec_le(buffer[offset:offset+4])
+            if attr_signature == 128:
+                break
+            offset += to_dec_le(buffer[offset+4:offset+8])       
+        offset += to_dec_le(buffer[offset+32:offset+34])
+        datarun = parse_datarun(buffer[offset:offset+8])
+        self.total_mft_sectors = datarun[1] * self.sector_per_cluster
+
         self.__gather_mft_id()
         tmp_ptr.close()
 
@@ -73,7 +84,7 @@ class NTFS:
         ptr = os.fdopen(fd, 'rb')
 
         sector_no = self.mft_start_cluster * self.sector_per_cluster
-        sector_max = sector_no + self.mft_zone_total_sectors
+        sector_max = sector_no + self.total_mft_sectors
 
         while sector_no < sector_max:
             # browse sector-by-sector
@@ -161,13 +172,10 @@ class NTFS:
                         buffer[curr_offset:curr_offset+4])
                     if attr_signature == 160:  # 0xA0 = 160
                         break
-                    curr_offset += to_dec_le(
-                        buffer[curr_offset+4:curr_offset+8])
+                    curr_offset += to_dec_le(buffer[curr_offset+4:curr_offset+6])
 
-                datarun_offset = curr_offset + \
-                    to_dec_le(buffer[curr_offset+32:curr_offset+34])
-                datarun = parse_datarun(
-                    buffer[datarun_offset:datarun_offset+8])
+                datarun_offset = curr_offset + to_dec_le(buffer[curr_offset+32:curr_offset+34])
+                datarun = parse_datarun(buffer[datarun_offset:datarun_offset+8])
 
                 cluster_max = datarun[1]
                 cluster_start = datarun[2]
