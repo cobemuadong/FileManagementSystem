@@ -266,7 +266,6 @@ class NTFS:
                 buffer = tmp_ptr.read(cluster_count*8*512)
                 byte_read = total_byte_left > cluster_count*8*512 and total_byte_left or cluster_count*8*512
                 data.append(buffer[0:byte_read].decode('utf-8', errors = 'ignore'))
-                print(''.join(data))
-            return ' '.join(data)
+            return ''.join(data)
 
-a = NTFS(r'\\.\E:')
+    
