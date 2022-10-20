@@ -63,6 +63,7 @@ class NTFS:
         tmp_ptr.close()
 
     def printVolumeInformation(self):
+        print('----------NTFS is dectected---------------')
         print('----------Volume information---------')
         print('Bytes per sector: ', self.byte_per_sector)
         print('Sectors per cluster (Sc): ', self.sector_per_cluster)
@@ -78,6 +79,7 @@ class NTFS:
         print('Cluster per Index: ', self.cluster_per_index)
         print('Volume serial number: ', self.volume_serial_number)
         print('-------------------------------------')
+        print('Enter \'help\' to show all existing command')
 
     def __gather_mft_id(self):
         fd = os.open(self.volume, os.O_RDONLY | os.O_BINARY)
@@ -141,12 +143,12 @@ class NTFS:
                     break
                 curr_offset += to_dec_le(buffer[curr_offset+4:curr_offset+8])
 
-            # resident flag to know whether the index entry is in this record or not
+            # index header flag to know whether the index entry is in this record or not
             flag_offset = curr_offset + \
                 to_dec_le(buffer[curr_offset+20:curr_offset+22]) + 28
-            resident_flag = to_dec_le(buffer[flag_offset:flag_offset+1])
+            index_header_flag = to_dec_le(buffer[flag_offset:flag_offset+1])
 
-            if resident_flag == 0:  # index entry inside this record
+            if index_header_flag == 0:  # index entry inside this record
                 max_offset = curr_offset + \
                     to_dec_le(buffer[curr_offset+4:curr_offset+8])
                 curr_offset = curr_offset + \
@@ -163,7 +165,7 @@ class NTFS:
                     # move to next
                     curr_offset += to_dec_le(buffer[curr_offset+8:curr_offset+10])
 
-            elif resident_flag == 1:  # index entry outside this record
+            elif index_header_flag == 1:  # index entry outside this record
                 # move to attribute 0xA0 to get the INDX sector
                 while curr_offset < self.mft_size_byte:
                     attr_signature = to_dec_le(
@@ -423,7 +425,7 @@ class NTFS:
 
         # print item(s) in directory
         print("")
-        print("{:<8}{:<8}{:<16}Name".format("Status","","Size (KB)"))
+        print("{:<8}{:<8}{:<16}{:<16}Name".format("Status","","Size (KB)","Sector"))
         for i in children_id:
             sector_no = self.get_mft_sector(i)
             if self.is_hidden(sector_no):
@@ -434,7 +436,10 @@ class NTFS:
                 print("{:<24}".format("<DIR>"), end="")
             else:
                 print("{:<8}{:<16}".format("",str(round(self.ReadSize(sector_no)/1024, 2))), end="")
+            print("{:<8}".format(sector_no),end = "")
             print(filename)
+
+
 
     def command_cd(self, cmd: str):
         '''
@@ -469,9 +474,19 @@ class NTFS:
         if (file_name[0] == file_name[len(file_name)-1]) and (ord(file_name[0]) in [34, 39]):
             file_name = file_name[1:len(file_name)-1]
 
-        if file_name[len(file_name)-4:len(file_name)] != ".txt":
+        file_extension = file_name.split('.')[1]
+        if file_extension != "txt":
             print("Can only read '.txt' files,")
-            print("try using other application to read this file")
+            if(file_extension == 'mp3' or file_extension =='mp4'):
+                print("Use Media Player to open this file")
+            elif(file_extension == 'doc' or file_extension =='docx'):
+                print("Use Word to open this file")
+            elif(file_extension == 'pptx'):
+                print("Use Power Point to open this file")
+            elif(file_extension == 'jpg' or file_extension == 'png'):
+                print("Use Photos to open this file")
+            else:
+                print("Try using other application to read this file")
             return
 
         for i in self.mft_id_list:

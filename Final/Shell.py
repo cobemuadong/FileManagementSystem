@@ -98,6 +98,8 @@ class Shell:
         print_str += format_str.format('name', 'size', 'attr', 'sector') 
 
         for entry in entry_info_list:
+            if entry['attr'] == "DHS":
+                continue
             print_str += format_str.format(entry['name'], entry['size'], entry['attr'], entry['sector'])
 
         return print_str
@@ -136,7 +138,15 @@ class Shell:
                     self.current_dir = entry 
                     return
         print('Bad command or filename:', subdir_name)
+        
+    def history_go_back(self):
+        if len(self.dir_hist) == 0:
+            print('History trong')
+            return 
 
+        last_entry = self.dir_hist[-1]
+        self.dir_hist.pop()
+        self.current_dir = last_entry
 
     def help(self):
         print(
@@ -192,7 +202,22 @@ class Shell:
                     else:
                         print('Khong ho tro lenh nay. Go lenh: help.')
                 elif input_first == 'cat':
-                    self.read_text_file(input_second)
+                    file_extension = input_second.split('.')[1]
+                    if file_extension == 'txt':
+                        self.read_text_file(input_second)
+                    else:
+                        print("Can only read '.txt' files,")
+                        if(file_extension == 'mp3' or file_extension =='mp4'):
+                            print("Use Media Player to open this file")
+                        elif(file_extension == 'doc' or file_extension =='docx'):
+                            print("Use Word to open this file")
+                        elif(file_extension == 'pptx'):
+                            print("Use Power Point to open this file")
+                        elif(file_extension == 'jpg' or file_extension == 'png'):
+                            print("Use Photos to open this file")
+                        else:
+                            print("try using other application to read this file")
+
                 elif input_first == 'back':
                     self.history_go_back()
                 elif input_first == 'exit':

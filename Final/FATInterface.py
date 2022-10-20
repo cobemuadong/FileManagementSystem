@@ -155,6 +155,15 @@ class DIRECTORY():
             # Loai entry
             entry_type = getNBytesAtBufferAndReturnDec(subentry_buffer, 0xB, 1)
 
+            deleted = getNBytesAtBufferAndReturnDec(subentry_buffer,0x00, 1)
+            if deleted & 0xe5 == 0xe5:
+                subentry_index += 32
+                continue
+
+            # if entry_type & 0x02 == 0x02:
+            #     subentry_index += 32
+            #     continue
+
             # Entry la thư mục
             if entry_type & 0x10 == 0x10: 
                 self.subentries.append(DIRECTORY(subentry_buffer, self.path, self.disk, longfilename_entries=longfilename_entries_queue))
