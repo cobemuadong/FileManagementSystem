@@ -21,6 +21,7 @@ def main():
         shell.select_disk()
 
         system_type = define_File_System(shell.disk_path)
+        print(system_type)
 
         if system_type == "NTFS":
             ntfs = NTFS(shell.disk_path)

@@ -154,16 +154,14 @@ class NTFS:
 
                 while curr_offset < max_offset:
                     child_id = to_dec_le(buffer[curr_offset:curr_offset+4])
-                    check_this_id = to_dec_le(
-                        buffer[curr_offset+16:curr_offset+20])
+                    check_this_id = to_dec_le(buffer[curr_offset+16:curr_offset+20])
                     if check_this_id != this_id:
                         break
                     if child_id != 0:
                         children.append(child_id)
 
                     # move to next
-                    curr_offset += to_dec_le(
-                        buffer[curr_offset+8:curr_offset+10])
+                    curr_offset += to_dec_le(buffer[curr_offset+8:curr_offset+10])
 
             elif resident_flag == 1:  # index entry outside this record
                 # move to attribute 0xA0 to get the INDX sector
@@ -182,18 +180,18 @@ class NTFS:
 
                 cluster_count = 0
                 while cluster_count < cluster_max:  # each cluster loop
-                    ptr.seek((cluster_start + cluster_count) *
+                    ptr.seek((cluster_start + cluster_count) *\
                              self.sector_per_cluster*self.byte_per_sector)
-                    temp_buffer = ptr.read(
+                    temp_buffer = ptr.read(\
                         self.sector_per_cluster*self.byte_per_sector)
 
                     # find the first index entry and plus 18h = 24d
                     temp_offset = to_dec_le(temp_buffer[24:24+4]) + 24
                     # each index entry loop
                     while temp_offset < self.sector_per_cluster * self.byte_per_sector:
-                        child_id = to_dec_le(
+                        child_id = to_dec_le(\
                             temp_buffer[temp_offset:temp_offset+4])
-                        check_this_id = to_dec_le(
+                        check_this_id = to_dec_le(\
                             temp_buffer[temp_offset+16:temp_offset+20])
                         if check_this_id != this_id:
                             break
@@ -201,7 +199,7 @@ class NTFS:
                             children.append(child_id)
 
                         # move to next
-                        temp_offset += to_dec_le(
+                        temp_offset += to_dec_le(\
                             temp_buffer[temp_offset+8:temp_offset+10])
 
                     cluster_count += 1
@@ -255,11 +253,11 @@ class NTFS:
         # Find attribute $80 $DATA
         current = to_dec_le(buffer[20:22])
         while current < 1024:
-            attr_signature = to_dec_le(
+            attr_signature = to_dec_le(\
                 buffer[current:current+4])
             if attr_signature == 128:
                 break
-            current += to_dec_le(
+            current += to_dec_le(\
                 buffer[current+4:current+8])
 
         return self.ReadFileText(tmp_ptr, buffer, current)
@@ -290,10 +288,12 @@ class NTFS:
                 cluster_count = index[0]
                 tmp_ptr.seek(cluster*8*512)
                 buffer = tmp_ptr.read(cluster_count*8*512)
-                byte_read = total_byte_left > cluster_count*8 * \
-                    512 and total_byte_left or cluster_count*8*512
-                data.append(buffer[0:byte_read].decode(
-                    'utf-8', errors='ignore'))
+                byte_read = 0
+                if(total_byte_left < cluster_count*8 * 512):
+                    byte_read = total_byte_left 
+                else:
+                    byte_read = cluster_count*8*512
+                data.append(buffer[0:byte_read].decode('utf-8', errors='ignore'))
                 print(''.join(data))
             return ' '.join(data)
 
@@ -308,11 +308,11 @@ class NTFS:
         # Find attribute $30 $FILE_NAME
         current = to_dec_le(buffer[20:22])
         while current < 1024:
-            attr_signature = to_dec_le(
+            attr_signature = to_dec_le(\
                 buffer[current:current+4])
             if attr_signature == 48:
                 break
-            current += to_dec_le(
+            current += to_dec_le(\
                 buffer[current+4:current+8])
 
         header = ReadAttributeHeader(buffer, current)
@@ -334,11 +334,10 @@ class NTFS:
         current = to_dec_le(buffer[20:22])
         attr_signature = 0
         while current < 1024:
-            attr_signature = to_dec_le(
-                buffer[current:current+4])
+            attr_signature = to_dec_le(buffer[current:current+4])
             if attr_signature == 128:                
                 break
-            current += to_dec_le(
+            current += to_dec_le(\
             buffer[current+4:current+8])
         if(attr_signature != 128):
             return -1
@@ -372,7 +371,7 @@ class NTFS:
             attr_signature = to_dec_le(buffer[current:current+4])
             if attr_signature == 16:                
                 break
-            current += to_dec_le(
+            current += to_dec_le(\
             buffer[current+4:current+8])
         if(attr_signature != 16):
             return -1
@@ -480,7 +479,7 @@ class NTFS:
                 for j in i.children_id:
                     if self.ReadFileName(self.get_mft_sector(j)) == file_name:
                         if self.is_directory(self.get_mft_sector(j)) == False:
-                            print(self.ReadFileTextBySector(
+                            print(self.ReadFileTextBySector(\
                                 self.get_mft_sector(j)))
                         else:
                             print("'" + file_name + "' is not a .txt file")
@@ -502,8 +501,7 @@ class NTFS:
         """
         print("\n" + self.volume[4] + ":", end="")
         for i in range(1, len(list_id)):
-            print(
-                "\\" + self.ReadFileName(self.get_mft_sector(list_id[i])), end="")
+            print("\\" + self.ReadFileName(self.get_mft_sector(list_id[i])), end="")
 
         print(">", end="")
 
