@@ -24,6 +24,7 @@ class NTFS:
     processing_list: list[int] = []
 
     def __init__(self, volume: str):
+        print("Pre-processing...")
         self.volume = volume
 
         tmp_fd = os.open(volume, os.O_RDONLY | os.O_BINARY)
@@ -425,7 +426,7 @@ class NTFS:
 
         # print item(s) in directory
         print("")
-        print("{:<8}{:<8}{:<16}{:<16}Name".format("Status","","Size (KB)","Sector"))
+        print("{:<8}{:<8}{:<16}{:<8}Name".format("Status","","Size (KB)","Sector"))
         for i in children_id:
             sector_no = self.get_mft_sector(i)
             if self.is_hidden(sector_no):
@@ -586,14 +587,14 @@ class NTFS:
     def process_command(self, cmd: str):
         command = cmd.split()
 
-        if command[0] not in ["help", "ls", "cd", "cat", "back", "cls"]:
+        if command[0] not in ["help", "ls", "cd", "cat", "back", "cls","dir"]:
             print("'" + command[0] + "' is not recognized as a valid command,")
             print("try typing 'help' to show all valid command")
             return
 
         if command[0] == "help":
             self.command_help(cmd)
-        elif command[0] == "ls":
+        elif command[0] == "ls" or command[0] == "dir":
             self.command_ls(cmd)
         elif command[0] == "cd":
             self.command_cd(cmd)
